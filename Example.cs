@@ -1,0 +1,311 @@
+﻿using System.Collections;
+using System.Collections.Generic;
+
+#if UNITY_EDITOR 
+//Example if you are running this inside of UNITY.
+using UnityEngine;
+
+public class Example : MonoBehaviour {
+	void Start() {
+		JsonExample.Main(null);
+	}
+}
+
+#endif
+
+public class JsonExample {
+
+	public static void Main(string[] args) {
+		//Check these functions out down below.
+		ArbitraryObjects();
+		ReflectionExample_Foobar();
+		ReflectionExample_LinkedList();
+		
+	}
+	
+	//Conditional stuff to support for examples in unity.
+	#if UNITY_EDITOR
+	public static void Print(object o) { Debug.Log(o.ToString()); }
+	public static void Print(string s) { Debug.Log(s); }
+	#else
+	public static void Print(object o) { Console.WriteLine(o.ToString(); }
+	public static void Print(string s) { Console.WriteLine(s); }
+	#endif
+	
+	public static void ArbitraryObjects() {
+		Print("Arbitrary Object Example");
+		//This test constructs an arbitrary JsonObject
+		//Then generates Json from the object, and reconstructs it.
+		//This is the basic way of using these object to construct Json text 
+			//if no model class exists to reflect from
+		
+		//JsonObjects are containers that map strings to JsonValues
+		//These mapped JsonValues can be primitives (strings, doubles, ints, bools)
+		//as well as other JsonObjects, or JsonArrays.
+		JsonObject obj = new JsonObject();
+		obj["name"] = "Ken Sama";
+		obj["class"] = "Samurai";
+		obj["str"] = 10;
+		obj["vit"] = 10;
+		obj["dex"] = 5;
+		obj["agi"] = 5;
+		
+		//There are a few ways to get number values out of a JsonObject.
+		//One is to use the numVal property, which will break if that value is not of that type (number)
+		//Another is to use GetFloat() (or GetNumber(), GetInt(), etc methods)
+		//which will return 0 if the key does not exist, or the value is not of that type.
+		obj["hp"] = 50 + obj["str"].numVal * 2 + obj["vit"].numVal * 10;
+		obj["atk"] = 20 + obj.GetFloat("str") * 2 + obj.GetFloat("dex");
+		obj["aspd"] = 100 + obj.GetNumber("agi") * 5 + obj.GetNumber("dex"); 
+		
+		//Arrays also can be created and filled via code.
+		JsonArray inv = new JsonArray();
+		obj["inventory"] = inv;
+		
+		//Arrays can store JsonValue types.
+		//Arrays are indexed like normal arrays, with integers starting from 0
+		//These can be any valid JsonValue, be it primitives, JsonObjects, or JsonArrays.
+		//JsonArrays function like a List<JsonValue> object might
+		//(Support for full IList<JsonValue> functionality pending.
+		JsonObject potion = new JsonObject();
+		inv.Add(potion);
+		potion["name"] = "Vial of Viscous White Liquid";
+		potion["type"] = "consumable";
+		potion["stackable"] = true;
+		potion["qty"] = 5;
+		potion["hprec"] = 50;
+		potion["effect"] = "spunky";
+		potion["effectDuration"] = 3;
+		
+		JsonObject sword = new JsonObject();
+		inv.Add(sword);
+		sword["name"] = "Katana of 1000 truths";
+		sword["type"] = "gear";
+		sword["atk"] = 105;
+		sword["equipSlot"] = "weapon";
+		
+		JsonArray gems = new JsonArray();
+		sword["gems"] = gems;
+		
+		//JsonValues can be parsed from well-formed json.
+		//This Json can come from just about any source.
+		gems.Add(Json.Parse("{\"name\":\"redGem\",\"type\":\"gem\",\"atk\":\"15\",\"str\":\"2\"}"));
+		gems.Add(Json.Parse("{\"name\":\"yellowGem\",\"type\":\"gem\",\"str\":\"3\",\"vit\":\"5\"}"));
+		
+		JsonObject armor = new JsonObject();
+		inv.Add(armor);
+		armor["name"] = "Yukata of Nihon";
+		armor["type"] = "gear";
+		armor["def"] = 15;
+		armor["equipSlot"] = "body";
+		armor["gems"] = new JsonArray();
+		//Empty arrays are also possible.
+		
+		inv.Add(Json.Parse("{\"name\":\"greenGem\",\"type\":\"gem\",\"dex\":\"5\",\"agi\":\"2\"}"));		
+		
+		string json = obj.PrettyPrint();
+		Print("Constructed an object: " + json);
+		
+		JsonValue parsed = Json.Parse(json);
+		JsonObject refObj = parsed as JsonObject;
+		
+		
+		string json2 = refObj.PrettyPrint();
+		Print("Parsed the json back into an object: " + json2);
+		
+		if (json == json2) {
+			Print("Objects generated same json!");
+		}
+		
+	}
+	
+	public static void ReflectionExample_Foobar() {
+		Print("Reflection Example - What things are reflected?");
+		//Create and set up the test object (see below for class)
+		Foobar foobar = new Foobar("poop", 5, 6, 7, 0, false);
+		foobar.mlgprostatus = true;
+		foobar.incomeDollahs = 53;
+		foobar.incomeDollahs = 120;
+		foobar.incomeDollahs = 77;
+		foobar.incomeDollahs = 170;
+		
+		foobar.names = new string[] { "Bob", "George", "Light", "Rock", "Roll", "Bass", "Treble", "Tango"};
+			foobar.numbers["strength"] = 10;
+		foobar.numbers["vitality"] = 10;
+		
+		Print("Started with: {\n" + foobar + "\n}\n\n");
+		
+		JsonValue reflected = Json.Reflect(foobar);
+		//Reflect an object
+		//Reflecting an object returns a JsonValue 
+		//(base class of all others)
+		//Primitive types:
+		//bool -> JsonBoolean
+		//string -> JsonString
+		//double, int, long, short, byte, float -> JsonNumber
+		//Array types will return a JsonArray
+		//Object types return a JsonObject
+		
+		//store the 'pretty' json in a string.
+		string json = reflected.PrettyPrint();
+		Print("Reflected the object into json: " + json + "\n\n");
+		
+		//Reconstruct a JsonObject by parsing the json.
+		JsonValue parsed = Json.Parse(json);
+		//Parse returns a JsonValue, not always an object
+		//Might be an array, number, string, boolean or null
+		//Cast the parsed object into a JsonObject
+		JsonObject refObject = parsed as JsonObject;
+		if (refObject != null) {
+			Foobar other = new Foobar();
+			Json.ReflectInto(refObject, other);
+			Print("Reconstructed object: {\n" + other + "\n}\n\n");
+		}
+		
+		
+	}
+	
+	//internal test class to serialize
+	public class Foobar {
+		//Fields of primitive types are serialized using the proper primitive type.
+		public string name = "bob";
+		public float x = 0;
+		public float y = 0;
+		public float z = 0;
+		public double dollars = 0;
+		public bool dead = false;
+		
+		//null references are serialized with a 'JsonNull' value type.
+		//Objects are serialized recursively, so any object 'nested'
+			//in a type is serialized as well.
+		public System.Object obj = null;
+		public Foobarbix nested = null;
+		//Anything that can be indexed by strings or ints is also serialized.
+		//Things indexed with strings are stored as objects.
+		//Otherwise, they're stored as arrays.
+		public Dictionary<string, float> numbers;
+		public string[] names = new string[] { "bobby", "hank", "peggy" };
+		
+		//Properties with only a 'get' are ignored.
+		//Properties with only a 'set' are ignored as well.
+		//Properties require both a 'get' and 'set' to be serialized
+		public float fucksGiven { get { return 0; } }
+		public float incomeDollahs { set { dollars += value; } }
+		private bool _mlgprostatus;
+		public bool mlgprostatus { 
+			get { return _mlgprostatus; }
+			set { _mlgprostatus = value; }
+		}
+		
+		public Foobar() {
+			numbers = new Dictionary<string, float>();
+			nested = new Foobarbix();
+			nested.bollucks = 5;
+		}
+		public Foobar(string n, float xx, float yy, float zz, double bucks, bool ded) {
+			numbers = new Dictionary<string, float>();
+			numbers["gp"] = 30;
+			name = n;
+			x = xx;
+			y = yy;
+			z = zz;
+			dollars = bucks;
+			dead = ded;
+			nested = new Foobarbix();
+			nested.bollucks = 3;
+		}
+		
+		//Massive messy function for testing purposes.
+		public override string ToString() {
+			string str = "name:  " + name;
+			str += mlgprostatus ? "xXx_313337MLG_PRO_xXx" : "";
+			str += "\n(" + x + ", " + y + ", " + z + ")";
+			str += "\n$" + dollars;
+			str += "\n" + (dead ? "DED" : "NOT DED");
+			if (obj == null) { 
+				str += "\nobj: NULL";		
+			} else {
+				str += "\nobj: " + obj.ToString();
+			}
+			
+			if (nested == null) {
+				str += "\nnested: NULL";
+			} else { 
+				str += "\nnested: {\n" + nested.ToString() + " }";
+			}
+			
+			if (numbers == null) {
+				str += "\nNumbers: NULL";
+			} else {
+				str += "\nNumbers: {";
+				foreach (var pair in numbers) {
+					str += "\n\t" + pair.Key + ":" + pair.Value;
+				}
+				str += "\n}";
+			}
+			
+			if (names == null) {
+				str += "\nNames: NULL";
+			} else {
+				str += "\nNames: {";
+				foreach (string s in names) { str += "\n\t" + s; }
+				str += "\n}";
+			}
+			
+			return str;
+		}
+		
+	}
+	//Another class that is nested inside 'Foobar'
+	public class Foobarbix {
+		public float bollucks;
+		public string blah { get { return "HULLO"; } }
+		public override string ToString() {
+			return "blah:" + blah + "\nbollucks: " + bollucks + "\n";
+		}
+	}
+	
+	
+	public static void ReflectionExample_LinkedList() {
+		Print("Reflection Example - Linked list (recursive nesting)");
+		NestedList list = new NestedList("HULLO");
+		//Set up the list with a few levels of bullshit.
+		NestedList a = list;
+		
+		//This can go any number of levels deep.
+		//Well, at least up until a stack overflow occurs...
+		for (int i = 0; i < 7; i++) {
+			string str = (i%2 == 0) ? "DELETE THIS" : "HULLO";
+			a.next = new NestedList(""+ i + str);
+			a = a.next;
+		}
+		Print("Started with the list: " + list);
+		
+		JsonValue reflected = Json.Reflect(list);
+		string json = reflected.PrettyPrint();
+		Print("Reflected list into Json: " + json);
+		
+		JsonValue parsed = Json.Parse(json);
+		JsonObject refObj = parsed as JsonObject;
+		NestedList reconstructed = new NestedList();
+		Json.ReflectInto(refObj, reconstructed);
+		
+		Print("Reconstructed list from Json: " + reconstructed);
+		
+	}
+	//A 'linked list' class.
+	public class NestedList {
+		public string val;
+		public NestedList next;
+		public NestedList() { val = ""; next = null; }
+		public NestedList(string str) { val = str; next = null; }
+		
+		public override string ToString() {
+			if (next == null) { return val; }
+			return val + "->" + next.ToString();
+		}
+	}
+	
+	
+	 
+}
