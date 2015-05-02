@@ -457,7 +457,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 }
 
-public class JsonArray : JsonValueCollection {
+public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 	protected override string BeginMarker { get { return "["; } }
 	protected override string EndMarker { get { return "]"; } }
@@ -486,6 +486,15 @@ public class JsonArray : JsonValueCollection {
 	public void Remove(JsonValue val) { list.Remove(val); }
 	public void Insert(int index, JsonValue val) { list.Insert(index, val); }
 	public void RemoveAt(int index) { list.RemoveAt(index); }
+	
+	
+	IEnumerator IEnumerable.GetEnumerator() {
+		return list.GetEnumerator();
+	}
+	
+	public IEnumerator<JsonValue> GetEnumerator() {
+		return list.GetEnumerator();
+	}
 	
 	
 	public double[] ToDoubleArray() { return ToDoubleList().ToArray(); }
