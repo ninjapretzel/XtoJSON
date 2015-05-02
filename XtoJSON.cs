@@ -329,6 +329,21 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 	}
 	
+	public object GetPrimitive(string name, Type type) {
+		JsonValue val = this[name];
+		if (type == typeof(string) 	&& val.isString) { return val.stringVal; }
+		if (type == typeof(float) 	&& val.isNumber) { return val.floatVal; } 
+		if (type == typeof(double) 	&& val.isNumber) { return val.numVal; } 
+		if (type == typeof(int) 	&& val.isNumber) { return val.intVal; } 
+		if (type == typeof(bool) 	&& val.isBool) { return val.boolVal; }
+		
+		if (type.IsValueType) {
+			return Activator.CreateInstance(type);
+		}
+		
+		return null;
+	}
+	
 	
 	public void Add(JsonObject other) { foreach (var pair in other) { this[pair.Key] = pair.Value; } }
 	public void Add(Dictionary<string, string> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
