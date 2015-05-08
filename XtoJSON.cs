@@ -322,6 +322,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public JsonObject() : base() {
 		data = new Dictionary<JsonString, JsonValue>();
 	}
+	
+	public JsonObject(JsonObject other) : base() {
+		data = new Dictionary<JsonString, JsonValue>();
+		Add(other);
+	}
 
 	public void Add(JsonString name, JsonValue value) {
 		if (!data.ContainsKey(name)) {
