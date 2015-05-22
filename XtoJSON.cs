@@ -419,8 +419,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public void Clear() { data.Clear(); }
 
 	public void Set(JsonObject other) {
-		foreach (var pair in other.GetData()) {
-			this[pair.Key.stringVal] = pair.Value;
+		foreach (var pair in other) {
+			this[pair.Key] = pair.Value;
 		}
 	}
 
