@@ -552,6 +552,16 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 	
+	public JsonObject[] ToJsonObjectArray() { return ToJsonObjectList().ToArray(); }
+	public List<JsonObject> ToJsonObjectList() {
+		List<JsonObject> arr = new List<JsonObject>();
+		for (int i = 0; i < Count; i++) {
+			JsonValue val = this[i];
+			if (val.isObject) { arr.Add(val as JsonObject); }
+		}
+		return arr;
+	}
+	
 	public T[] ToArrayOf<T>() { return ToListOf<T>().ToArray(); }
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
