@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 
 #if UNITY_EDITOR 
@@ -20,6 +21,7 @@ public class JsonExample {
 		ArbitraryObjects();
 		ReflectionExample_Foobar();
 		ReflectionExample_LinkedList();
+		StructTest();
 		
 	}
 	
@@ -163,6 +165,63 @@ public class JsonExample {
 		}
 		
 		
+	}
+	
+	public static void StructTest() {
+		Debug.Log("Struct by itself:");
+		Skruck cuck = new Skruck(4, 5, 6, 7);
+		
+		JsonObject reflected = Json.Reflect(cuck) as JsonObject;
+		Debug.Log("Reflected a struct: " + cuck + "\n" + reflected.PrettyPrint());
+		
+		cuck = new Skruck(1,2,3,4);
+		Debug.Log("Changed Struct: " + cuck);
+		
+		try {
+			Json.ReflectInto(reflected, cuck);
+		} catch (Exception e) {
+			Debug.Log("Produced Exception: " + e);
+		}
+		cuck = (Skruck) Json.GetValue(reflected, typeof(Skruck));
+		Debug.Log("Reflected back into struct with Json.GetValue(). Result: " + cuck);
+		
+		///
+		Debug.Log("Struct nested inside object:");
+		Skree skree = new Skree();
+		Debug.Log("Started with: " + skree);
+		
+		reflected = Json.Reflect(skree) as JsonObject;
+		Debug.Log("Reflected into: " + reflected.PrettyPrint()); 
+		
+		skree.bob = new Skruck(99, 98, 97, 96);
+		skree.joe = new Skruck(95, 94, 93, 92);
+		Debug.Log("Changed to: " + skree);
+		
+		Json.ReflectInto(reflected, skree);
+		
+		Debug.Log("Reflected back into: " + skree);
+		
+		
+	}
+	
+	public class Skree {
+		public Skruck bob;
+		public Skruck joe;
+		
+		public Skree() {
+			bob = new Skruck(1, 1, 1, 1);
+			joe = new Skruck(2, 3, 4, 5);
+		}
+		public override string ToString() { return "bob: " + bob + " | joe: " + joe; }
+	}
+	
+	public struct Skruck {
+		public float r;
+		public float g;
+		public float b;
+		public float a;
+		public Skruck(float x, float y, float z, float w) { r = x; g = y; b = z; a = w; }
+		public override string ToString() { return "[" + r + ", " + g + ", " + b + ", " + a + "]"; }
 	}
 	
 	//internal test class to serialize

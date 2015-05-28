@@ -20,6 +20,7 @@ public static class Json {
 	}
 	
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
+	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
 	
 	
 	public static void ReflectInto(JsonObject source, object destination) {
@@ -685,8 +686,23 @@ public class JsonReflector {
 			
 		} else if (val.isObject) {
 			//TBD: Reflect the JsonObject into a new object of that type
+			JsonObject jobj = val as JsonObject;
+			
+			if (destType.IsValueType) {
+				object boxedValue = Activator.CreateInstance(destType);
+				FieldInfo[] fields = destType.GetFields();
+				foreach (FieldInfo field in fields) {
+					object innerVal = GetReflectedValue(jobj[field.Name], field.FieldType);
+					if (innerVal != null) {
+						field.SetValue(boxedValue, innerVal);
+					}
+				}
+				return boxedValue;
+			}
 			sval = destType.GetNewInstance();
-			if (sval != null) { ReflectInto((JsonObject)val, sval); }
+			if (sval != null) { ReflectInto(jobj, sval); }
+			
+			
 		}
 		
 		return sval;
@@ -694,9 +710,10 @@ public class JsonReflector {
 	
 	//Reflects info stored in 
 	public static void ReflectInto(JsonObject source, object destination) {
-		var data = source.GetData();
 		Type type = destination.GetType();
+		if (type.IsValueType) { throw new Exception("Can't reflect Json into a value type. Use Json.GetValue(JsonValue, Type) instead."); }
 		
+		var data = source.GetData();
 		
 		PropertyInfo mapper = type.GetProperty("Item", new Type[]{typeof(string)});
 		Type mapperValueType = null;
@@ -794,6 +811,9 @@ public class JsonReflector {
 	public static JsonValue Reflect(object source) {
 		if (source == null) { return null; }
 		Type type = source.GetType();
+		
+		if (typeof(JsonValue).IsAssignableFrom(type)) { return ((JsonValue)source); }
+		
 		JsonValue jval = null;
 		
 		//Handle primitive types
