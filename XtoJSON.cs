@@ -21,7 +21,7 @@ public static class Json {
 	
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
-	
+	public static object GetValue<T>(JsonValue val) { return GetValue(val, typeof(T)); }
 	
 	public static void ReflectInto(JsonObject source, object destination) {
 		if (source != null) {
