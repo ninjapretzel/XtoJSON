@@ -812,6 +812,7 @@ public class JsonReflector {
 		if (source == null) { return null; }
 		Type type = source.GetType();
 		
+		//Return object directly if it is already a JsonValue in some way.
 		if (typeof(JsonValue).IsAssignableFrom(type)) { return ((JsonValue)source); }
 		
 		JsonValue jval = null;
