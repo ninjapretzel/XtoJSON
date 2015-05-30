@@ -317,18 +317,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return true;
 	}
 
-	public JsonObject(Dictionary<JsonString, JsonValue> namevaluepairs) : base() {
-		data = namevaluepairs;
-	}
+	public JsonObject() : base() { data = new Dictionary<JsonString, JsonValue>(); }
+	public JsonObject(JsonObject src) : this() { Add(src); }
+	public JsonObject(Dictionary<JsonString, JsonValue> src) : base() { data = src; }
 
-	public JsonObject() : base() {
-		data = new Dictionary<JsonString, JsonValue>();
-	}
-	
-	public JsonObject(JsonObject other) : base() {
-		data = new Dictionary<JsonString, JsonValue>();
-		Add(other);
-	}
+	public JsonObject Clone() { return new JsonObject(this); }
 	
 	public JsonObject Add(JsonString name, JsonValue value) {
 		if (!data.ContainsKey(name)) {
@@ -337,6 +330,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 	
+	public object GetPrimitive<T>(string name) { return GetPrimitive(name, typeof(T)); }
 	public object GetPrimitive(string name, Type type) {
 		JsonValue val = this[name];
 		if (type == typeof(string) 	&& val.isString) { return val.stringVal; }
@@ -345,8 +339,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		if (type == typeof(int) 	&& val.isNumber) { return val.intVal; } 
 		if (type == typeof(bool) 	&& val.isBool) { return val.boolVal; }
 		
-		if (type.IsValueType) {
-			return Activator.CreateInstance(type);
+		if (type.IsValueType && val.isObject) {
+			return Json.GetValue(val, type);
 		}
 		
 		return null;
@@ -484,12 +478,20 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		set { list[index] = value; }
 	}
 
-	public JsonArray(List<JsonValue> values) : base() { list = values; }
 	public JsonArray() : base() { list = new List<JsonValue>(); }
-
+	public JsonArray(List<JsonValue> values) : base() { list = values; }
+	public JsonArray(JsonArray src) : this() { AddAll(src); }
+	
+	public JsonArray Clone() { return new JsonArray(this); }
+	
 	//For some reason, this function had a 'if !list.Contains(value)' predicate before the add
 	//Figured this was a mistake, but just in case it fucks up.
 	public JsonArray Add(JsonValue val) { list.Add(val); return this; }
+	public JsonArray AddAll(IEnumerable<JsonValue> info) {
+		foreach (JsonValue val in info) { Add(val); }
+		return this;
+	}
+	
 	public JsonArray Clear() { list.Clear(); return this; }
 	public bool Contains(JsonValue val) { return list.Contains(val); }
 	public int IndexOf(JsonValue val) { return list.IndexOf(val); }
