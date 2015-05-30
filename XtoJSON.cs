@@ -329,11 +329,12 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		data = new Dictionary<JsonString, JsonValue>();
 		Add(other);
 	}
-
-	public void Add(JsonString name, JsonValue value) {
+	
+	public JsonObject Add(JsonString name, JsonValue value) {
 		if (!data.ContainsKey(name)) {
 			data.Add(name, value);
 		}
+		return this;
 	}
 	
 	public object GetPrimitive(string name, Type type) {
@@ -352,14 +353,14 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	}
 	
 	
-	public void Add(JsonObject other) { foreach (var pair in other) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, string> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, double> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, short> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, float> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, long> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, byte> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
-	public void Add(Dictionary<string, int> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } }
+	public JsonObject Add(JsonObject other) { foreach (var pair in other) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, string> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, double> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, short> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, float> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, long> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, byte> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	public JsonObject Add(Dictionary<string, int> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 	
 	IEnumerator IEnumerable.GetEnumerator() {
 		return data.GetEnumerator();
@@ -414,16 +415,18 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	}
 	
 	//public void Add(string name, JsonValue value) { data.Add(name, value); }
-	public void Remove(string key) { 
+	public JsonObject Remove(string key) { 
 		if (ContainsKey(key)) { data.Remove(key); }
+		return this;
 	}
 	
-	public void Clear() { data.Clear(); }
+	public JsonObject Clear() { data.Clear(); return this; }
 
-	public void Set(JsonObject other) {
+	public JsonObject Set(JsonObject other) {
 		foreach (var pair in other) {
 			this[pair.Key] = pair.Value;
 		}
+		return this;
 	}
 
 	protected override string CollectionToPrettyPrint() {
@@ -486,13 +489,13 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 	//For some reason, this function had a 'if !list.Contains(value)' predicate before the add
 	//Figured this was a mistake, but just in case it fucks up.
-	public void Add(JsonValue val) { list.Add(val); }
-	public void Clear() { list.Clear(); }
+	public JsonArray Add(JsonValue val) { list.Add(val); return this; }
+	public JsonArray Clear() { list.Clear(); return this; }
 	public bool Contains(JsonValue val) { return list.Contains(val); }
 	public int IndexOf(JsonValue val) { return list.IndexOf(val); }
-	public void Remove(JsonValue val) { list.Remove(val); }
-	public void Insert(int index, JsonValue val) { list.Insert(index, val); }
-	public void RemoveAt(int index) { list.RemoveAt(index); }
+	public JsonArray Remove(JsonValue val) { list.Remove(val); return this; }
+	public JsonArray Insert(int index, JsonValue val) { list.Insert(index, val); return this; }
+	public JsonArray RemoveAt(int index) { list.RemoveAt(index); return this; }
 	
 	
 	IEnumerator IEnumerable.GetEnumerator() {
