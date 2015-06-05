@@ -20,7 +20,7 @@ public class JsonExample {
 		//Check these functions out down below.
 		ArbitraryObjects();
 		ReflectionExample_Foobar();
-		ReflectionExample_LinkedList();
+		ReflectionExample_NestedList();
 		StructTest();
 		
 	}
@@ -134,6 +134,9 @@ public class JsonExample {
 		foobar.names = new string[] { "Bob", "George", "Light", "Rock", "Roll", "Bass", "Treble", "Tango"};
 			foobar.numbers["strength"] = 10;
 		foobar.numbers["vitality"] = 10;
+
+		foobar.blacklisted = "lolbutts";
+		foobar.black = "grey";
 		
 		Print("Started with: {\n" + foobar + "\n}\n\n");
 		
@@ -160,19 +163,21 @@ public class JsonExample {
 		JsonObject refObject = parsed as JsonObject;
 		if (refObject != null) {
 			Foobar other = new Foobar();
+			Print("Made new object: {\n" + other + "\n}\n\n");
+
 			Json.ReflectInto(refObject, other);
-			Print("Reconstructed object: {\n" + other + "\n}\n\n");
+			Print("Reflected json into new object: {\n" + other + "\n}\n\n");
 		}
 		
 		
 	}
 	
 	public static void StructTest() {
-		Debug.Log("Struct by itself:");
 		Skruck cuck = new Skruck(4, 5, 6, 7);
+		Debug.Log("Struct by itself:" + cuck);
 		
 		JsonObject reflected = Json.Reflect(cuck) as JsonObject;
-		Debug.Log("Reflected a struct: " + cuck + "\n" + reflected.PrettyPrint());
+		Debug.Log("Reflected a struct: \n" + reflected.PrettyPrint());
 		
 		cuck = new Skruck(1,2,3,4);
 		Debug.Log("Changed Struct: " + cuck);
@@ -226,6 +231,9 @@ public class JsonExample {
 	
 	//internal test class to serialize
 	public class Foobar {
+		//Blacklist of stuff not to reflect/restore
+		public static string[] _blacklist = new string[] { "black", "listed", "blacklisted" };
+
 		//Fields of primitive types are serialized using the proper primitive type.
 		public string name = "bob";
 		public float x = 0;
@@ -233,7 +241,11 @@ public class JsonExample {
 		public float z = 0;
 		public double dollars = 0;
 		public bool dead = false;
-		
+
+		//blacklisted fields. contained in the _blacklist.
+		public string black = "blue";
+		public string listed = "nope";
+
 		//null references are serialized with a 'JsonNull' value type.
 		//Objects are serialized recursively, so any object 'nested'
 			//in a type is serialized as well.
@@ -254,6 +266,16 @@ public class JsonExample {
 		public bool mlgprostatus { 
 			get { return _mlgprostatus; }
 			set { _mlgprostatus = value; }
+		}
+
+		//blacklisted property. satisfies get/set requirements, but is in the _blacklist.
+		public string blacklisted {
+			get { return black + listed; }
+			set { 
+				int len = value.Length;
+				black = value.Substring(0, len/2);
+				listed = value.Substring(len/2);
+			}
 		}
 		
 		public Foobar() {
@@ -276,8 +298,11 @@ public class JsonExample {
 		
 		//Massive messy function for testing purposes.
 		public override string ToString() {
-			string str = "name:  " + name;
-			str += mlgprostatus ? "xXx_313337MLG_PRO_xXx" : "";
+			string str = "name:  ";
+			str += mlgprostatus ? "xXx_313337_" : "";
+			str += name;
+			str += mlgprostatus ? "_MLG_PRO_xXx" : "";
+
 			str += "\n(" + x + ", " + y + ", " + z + ")";
 			str += "\n$" + dollars;
 			str += "\n" + (dead ? "DED" : "NOT DED");
@@ -292,6 +317,10 @@ public class JsonExample {
 			} else { 
 				str += "\nnested: {\n" + nested.ToString() + " }";
 			}
+
+			str += "\nBlacklisted:" + blacklisted;
+			str += "\nblack:" + black;
+			str += "\nlisted:" + listed;
 			
 			if (numbers == null) {
 				str += "\nNumbers: NULL";
@@ -325,8 +354,8 @@ public class JsonExample {
 	}
 	
 	
-	public static void ReflectionExample_LinkedList() {
-		Print("Reflection Example - Linked list (recursive nesting)");
+	public static void ReflectionExample_NestedList() {
+		Print("Reflection Example - Nested List (recursive nesting)");
 		NestedList list = new NestedList("HULLO");
 		//Set up the list with a few levels of bullshit.
 		NestedList a = list;

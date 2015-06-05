@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.1.4";
+	public const string VERSION = "0.1.5";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -732,15 +732,12 @@ public class JsonReflector {
 		
 		PropertyInfo indexer = type.GetProperty("Item", new Type[]{typeof(int)});
 		Type indexerValueType = null;
-		//MethodInfo indexerSetMethod = null;
 		MethodInfo adder = null;
 		
 		if (indexer != null) {
 			indexerValueType = indexer.PropertyType;
-			//indexerSetMethod = indexer.GetSetMethod();
 			adder = type.GetMethod("Add", new Type[]{indexerValueType});
 		}
-		
 		
 		JsonArray _ITEMS = null;
 		foreach (var pair in data) {
@@ -751,8 +748,6 @@ public class JsonReflector {
 				_ITEMS = val as JsonArray;
 				continue;
 			}
-				
-			
 			
 			PropertyInfo property = type.GetProperty(key, publicMember);
 			if (property != null && property.IsWritable() && property.IsReadable()) {
@@ -765,8 +760,7 @@ public class JsonReflector {
 					setMethod.Invoke(destination, new object[]{sval});
 				}
 				
-				//If there exists a property by a name,
-				//There is likely no field by the same name
+				//If there exists a property by a name, there is likely no field by the same name
 				//unless you're a hacker.
 				continue;
 			}
@@ -853,17 +847,26 @@ public class JsonReflector {
 			
 			JsonObject obj = new JsonObject();
 			jval = obj;
-			
+
+			string[] blacklist = null;
+			FieldInfo blacklistField = type.GetField("_blacklist", BindingFlags.Public | BindingFlags.Static);
+			if (blacklistField != null && blacklistField.FieldType == typeof(string[])) {
+				blacklist = (string[])blacklistField.GetValue(null);
+			}
+			if (blacklist == null) { blacklist = new string[0]; }
+
+
 			if (keys != null 
 					&& mapper != null
 					&& typeof(IEnumerable<string>).IsAssignableFrom(keys.PropertyType)) {
-				
 				
 				MethodInfo keysGet = keys.GetGetMethod();
 				MethodInfo mapperGet = mapper.GetGetMethod();
 				IEnumerable<string> sKeys = (IEnumerable<string>)keysGet.Invoke(source, null);
 				
 				foreach (string key in sKeys) {
+					if (blacklist.Contains<string>(key)) { continue; }
+
 					object mappedObj = mapperGet.Invoke(source, new object[]{key});
 					obj.Add(key, Reflect(mappedObj));
 				}
@@ -881,20 +884,22 @@ public class JsonReflector {
 				}
 				obj.Add("_ITEMS", arr);
 			}
-				
 			
 			foreach (PropertyInfo property in properties) {
-				if (property.Name == "Item" || !property.IsWritable() || !property.IsReadable()) {
-					continue;
-				}
+				if (property.Name == "Item"
+						|| blacklist.Contains<string>(property.Name) 
+						|| !property.IsWritable() 
+						|| !property.IsReadable()) { continue; }
+
 				MethodInfo propGet = property.GetGetMethod();
-				
 				
 				object grabbed = propGet.Invoke(source, null);
 				obj.Add(property.Name, Reflect(grabbed));
 			}
 			
 			foreach (FieldInfo field in fields) {
+				if (blacklist.Contains<string>(field.Name)) { continue; }
+				
 				object grabbed = field.GetValue(source);
 				obj.Add(field.Name, Reflect(grabbed));
 			}
