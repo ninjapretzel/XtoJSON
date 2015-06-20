@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
@@ -12,11 +12,19 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.1.5";
+	public const string VERSION = "0.1.6";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		return jds.Deserialize();
+	}
+
+	public static JsonValue TryParse(string json) {
+		try { return Parse(json); }
+		catch {
+			Console.WriteLine("Error! Couldn't Parse Json!");
+			return null;
+		}
 	}
 	
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
