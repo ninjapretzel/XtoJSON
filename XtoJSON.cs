@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.1.6";
+	public const string VERSION = "0.1.7";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
