@@ -499,6 +499,12 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (JsonValue val in info) { Add(val); }
 		return this;
 	}
+
+	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonArray {
+		foreach (T val in info) { Add( (JsonArray) val ); }
+		return this;
+	}
+	
 	
 	public JsonArray Clear() { list.Clear(); return this; }
 	public bool Contains(JsonValue val) { return list.Contains(val); }
