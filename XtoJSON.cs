@@ -500,8 +500,8 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return this;
 	}
 
-	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonArray {
-		foreach (T val in info) { Add( (JsonArray) val ); }
+	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonValue {
+		foreach (T val in info) { Add( (JsonValue) val ); }
 		return this;
 	}
 	
