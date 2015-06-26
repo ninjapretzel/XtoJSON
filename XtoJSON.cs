@@ -433,7 +433,6 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 	public JsonObject Set<T>(Dictionary<string, T> info) {
 		foreach (var pair in info) {
-			Type t = info.GetType();
 			this[pair.Key] = Json.Reflect(pair.Value);
 		}
 		return this;
