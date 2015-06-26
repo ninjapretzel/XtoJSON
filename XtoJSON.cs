@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.1.7";
+	public const string VERSION = "0.1.8";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -427,6 +427,14 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public JsonObject Set(JsonObject other) {
 		foreach (var pair in other) {
 			this[pair.Key] = pair.Value;
+		}
+		return this;
+	}
+
+	public JsonObject Set<T>(Dictionary<string, T> info) {
+		foreach (var pair in info) {
+			Type t = info.GetType();
+			this[pair.Key] = Json.Reflect(pair.Value);
 		}
 		return this;
 	}
