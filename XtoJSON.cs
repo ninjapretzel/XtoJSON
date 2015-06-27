@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.1.8";
+	public const string VERSION = "0.2.0";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -1050,17 +1050,22 @@ public class JsonDeserializer {
 	bool MoveNext() {
 		while (index < json.Length && next != ',' && next != ']' && next != '}') { index++; }
 
-		if (index >= json.Length) { return false; }
-		if (json[index] == ']' || json[index] == '}') {
+		if (next == ',') {
 			index++;
-			return false;
+			SkipWhitespaceEnd();
+			if (next == ']' || next == '}') {
+				index++; 
+				return false;
+			}
+			if (index >= json.Length) { return false; }
+			
+		} else {
+			if (json[index] == ']' || json[index] == '}') {
+				index++;
+				return false;
+			}
+			if (index >= json.Length) { return false; }
 		}
-
-		index++;
-
-		SkipWhitespaceEnd();
-
-		if (index >= json.Length) { return false; }
 
 		return true;
 	}
