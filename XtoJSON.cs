@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.2.0";
+	public const string VERSION = "0.2.1";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -337,6 +337,19 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return this;
 	}
+
+	public JsonObject AddAll<T>(IEnumerable<KeyValuePair<string, T>> info) where T : JsonValue {
+		foreach (var pair in info) {
+			this[pair.Key] = pair.Value;
+		}
+		return this;
+	}
+	public JsonObject AddAllReflect<T>(IEnumerable<KeyValuePair<string, T>> info) {
+		foreach (var pair in info) {
+			this[pair.Key] = Json.Reflect(pair.Value);
+		}
+		return this;
+	}
 	
 	public object GetPrimitive<T>(string name) { return GetPrimitive(name, typeof(T)); }
 	public object GetPrimitive(string name, Type type) {
@@ -507,8 +520,14 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return this;
 	}
 
+	
+
 	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonValue {
 		foreach (T val in info) { Add( (JsonValue) val ); }
+		return this;
+	}
+	public JsonArray AddAllReflect<T>(IEnumerable<T> info) { 
+		foreach (T val in info) { Add( Json.Reflect(val) ); }
 		return this;
 	}
 	
