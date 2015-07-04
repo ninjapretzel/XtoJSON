@@ -12,7 +12,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.2.1";
+	public const string VERSION = "0.2.2";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -30,7 +30,11 @@ public static class Json {
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
 	
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
-	public static object GetValue<T>(JsonValue val) { return GetValue(val, typeof(T)); }
+	public static T GetValue<T>(JsonValue val) {
+		object o = GetValue(val, typeof(T)); 
+		if (o == null) { return default(T); }
+		return (T)o;
+	}
 	
 	public static void ReflectInto(JsonObject source, object destination) {
 		if (source != null) {
