@@ -1,3 +1,17 @@
+//Definition Flags:
+
+//XtoJSON_StrictCommaRules 
+//	Enabled - When parsing JSON, makes commas before end-group characters cause an exception.
+//	Disabled - Commas before end-group characters are allowed
+//Example: { "blah":"bluh", } 
+//	the above JSON will cause an exception to be thrown with the flag enabled, 
+//	and will parse successfully with the flag disabled.
+
+//XtoJSON_StringNumbers
+//	Enabled - numbers are stored internally as a string value, and are converted to and from number types
+//	Disabled - numbers are stored internally as a double value.
+//May have minor performance implications.
+
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,12 +21,14 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 
+
+
 #region Abstract/Primary stuff
 
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.2.2";
+	public const string VERSION = "0.2.3";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -202,6 +218,9 @@ public class JsonBool : JsonValue {
 }
 
 public class JsonNumber : JsonValue {
+	public override JsonType JsonType { get { return JsonType.Number; } }
+
+#if XtoJSON_StringNumbers
 	private string _value;
 
 	public override double numVal { get { return Double.Parse(_value); } }
@@ -209,7 +228,6 @@ public class JsonNumber : JsonValue {
 	public override float floatVal { get { return Single.Parse(_value); } }
 	public override int intVal	{ get { return Int32.Parse(_value); } }
 
-	public override JsonType JsonType { get { return JsonType.Number; } }
 
 	protected static NumberFormatInfo formatter = defaultNumberFormat;
 	static NumberFormatInfo defaultNumberFormat {
@@ -234,7 +252,29 @@ public class JsonNumber : JsonValue {
 
 	public override string ToString() { return _value; }
 	public override string PrettyPrint() { return ToString(); }
+#else
+	private double _value;
 
+	public override double numVal { get { return _value; } }
+	public override double doubleVal { get { return _value; } }
+	public override float floatVal { get { return (float)_value; } }
+	public override int intVal { get { return (int)_value; } }
+
+	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
+	public static implicit operator JsonNumber(decimal val) { return new JsonNumber((double)val); }
+	public static implicit operator JsonNumber(float val) { return new JsonNumber(val); }
+	public static implicit operator JsonNumber(int val) { return new JsonNumber(val); }
+	internal JsonNumber(double value) : base() { _value = value; }
+
+	public JsonNumber(int value) : this((double)value) { }
+	public JsonNumber(float value) : this((double)value) { }
+	public JsonNumber(decimal value) : this((double)value) { }
+	public JsonNumber(byte value) : this((double)value) { }
+
+	public override string ToString() { return ""+_value; }
+	public override string PrettyPrint() { return ""+_value; }
+
+#endif
 }
 
 public class JsonString : JsonValue {
@@ -264,30 +304,6 @@ public class JsonString : JsonValue {
 	public static string ToJsonString(string text) {
 		if (text == null) { return "\"\""; }
 		return "\"" + text.JsonEscapeString() + "\"";
-		/*
-		char[] charArray = text.ToCharArray();
-		List<string> output = new List<string>();
-		foreach (char c in charArray) {
-			if (((int)c) == 8) {	
-				output.Add("\\b");
-			} else if (((int)c) == 9) {
-				output.Add("\\t");
-			} else if (((int)c) == 10) {
-				output.Add("\\n");
-			} else if (((int)c) == 12) {
-				output.Add("\\f");
-			} else if (((int)c) == 13) {
-				output.Add("\\n");
-			} else if (((int)c) == 34) {
-				output.Add("\\\"");
-			}else if (((int)c) == 92) {
-				output.Add("\\\\");
-			} else if (((int)c) > 31) {
-				output.Add(c.ToString());
-			}
-		}
-		return "\"" + string.Join("", output.ToArray()) + "\"";
-		//*/
 	}
 }
 
@@ -1072,13 +1088,17 @@ public class JsonDeserializer {
 
 	bool MoveNext() {
 		while (index < json.Length && next != ',' && next != ']' && next != '}') { index++; }
-
+		
 		if (next == ',') {
 			index++;
 			SkipWhitespaceEnd();
 			if (next == ']' || next == '}') {
+#if XtoJSON_StrictCommaRules
+				throw new Exception("Commas before end characters not allowed.");
+#else
 				index++; 
 				return false;
+#endif
 			}
 			if (index >= json.Length) { return false; }
 			
