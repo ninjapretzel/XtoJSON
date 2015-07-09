@@ -28,7 +28,7 @@ using System.Linq;
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
 public static class Json {
-	public const string VERSION = "0.2.3";
+	public const string VERSION = "0.2.4";
 
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -56,6 +56,22 @@ public static class Json {
 		if (source != null) {
 			JsonReflector.ReflectInto(source, destination);
 		}
+	}
+
+	public static JsonType ReflectedType(object o) {
+		if (o == null) { return JsonType.Null; }
+		Type t = o.GetType();
+		if (t.IsArray) { return JsonType.Array; }
+		if (t == typeof(string)) { return JsonType.String; }
+		if (t == typeof(bool)) { return JsonType.Boolean; }
+		
+		if (t == typeof(int)
+			|| t == typeof(byte)
+			|| t == typeof(float)
+			|| t == typeof(double)
+			|| t == typeof(long)) { return JsonType.Number; }
+
+		return JsonType.Object;
 	}
 	
 	public static JsonValue ParseJson(this string json) { return Parse(json); }
@@ -396,7 +412,16 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public JsonObject Add(Dictionary<string, long> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 	public JsonObject Add(Dictionary<string, byte> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 	public JsonObject Add(Dictionary<string, int> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	
+
+	public T Extract<T>(string key, T defaultValue) {
+		if (ContainsKey(key)) {
+			JsonValue val = this[key];
+			
+			if (val.JsonType == Json.ReflectedType(defaultValue) ) { return Json.GetValue<T>(val); }
+		}
+		return defaultValue;
+	}
+
 	IEnumerator IEnumerable.GetEnumerator() {
 		return data.GetEnumerator();
 	}
