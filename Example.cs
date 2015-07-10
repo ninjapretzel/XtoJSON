@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 
@@ -24,16 +24,23 @@ public class JsonExample {
 		StructTest();
 		
 	}
-	
+
 	//Conditional stuff to support for examples in unity.
-	#if UNITY_EDITOR
+#if UNITY_EDITOR
 	public static void Print(object o) { Debug.Log(o.ToString()); }
 	public static void Print(string s) { Debug.Log(s); }
-	#else
+#elif UNITY_STANDALONE
+	public class Debug {
+		public static void Log(string s) { }
+		public static void Log(object o) { }
+	}
+	public static void Print(object o) {}
+	public static void Print(string s) {}
+#else
 	public static void Print(object o) { Console.WriteLine(o.ToString(); }
 	public static void Print(string s) { Console.WriteLine(s); }
-	#endif
-	
+#endif
+
 	public static void ArbitraryObjects() {
 		Print("Arbitrary Object Example");
 		//This test constructs an arbitrary JsonObject
@@ -174,37 +181,37 @@ public class JsonExample {
 	
 	public static void StructTest() {
 		Skruck cuck = new Skruck(4, 5, 6, 7);
-		Debug.Log("Struct by itself:" + cuck);
+		Print("Struct by itself:" + cuck);
 		
 		JsonObject reflected = Json.Reflect(cuck) as JsonObject;
-		Debug.Log("Reflected a struct: \n" + reflected.PrettyPrint());
+		Print("Reflected a struct: \n" + reflected.PrettyPrint());
 		
 		cuck = new Skruck(1,2,3,4);
-		Debug.Log("Changed Struct: " + cuck);
+		Print("Changed Struct: " + cuck);
 		
 		try {
 			Json.ReflectInto(reflected, cuck);
 		} catch (Exception e) {
-			Debug.Log("Produced Exception: " + e);
+			Print("Produced Exception: " + e);
 		}
 		cuck = (Skruck) Json.GetValue(reflected, typeof(Skruck));
-		Debug.Log("Reflected back into struct with Json.GetValue(). Result: " + cuck);
+		Print("Reflected back into struct with Json.GetValue(). Result: " + cuck);
 		
 		///
-		Debug.Log("Struct nested inside object:");
+		Print("Struct nested inside object:");
 		Skree skree = new Skree();
-		Debug.Log("Started with: " + skree);
+		Print("Started with: " + skree);
 		
 		reflected = Json.Reflect(skree) as JsonObject;
-		Debug.Log("Reflected into: " + reflected.PrettyPrint()); 
+		Print("Reflected into: " + reflected.PrettyPrint()); 
 		
 		skree.bob = new Skruck(99, 98, 97, 96);
 		skree.joe = new Skruck(95, 94, 93, 92);
-		Debug.Log("Changed to: " + skree);
+		Print("Changed to: " + skree);
 		
 		Json.ReflectInto(reflected, skree);
 		
-		Debug.Log("Reflected back into: " + skree);
+		Print("Reflected back into: " + skree);
 		
 		
 	}
