@@ -47,6 +47,9 @@ public static class Json {
 	
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
 	public static T GetValue<T>(JsonValue val) {
+		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); }
+		else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
+
 		object o = GetValue(val, typeof(T)); 
 		if (o == null) { return default(T); }
 		return (T)o;
@@ -386,6 +389,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return this;
 	}
+
+	public T Get<T>(string key) { return Json.GetValue<T>(this[key]); }
 	
 	public object GetPrimitive<T>(string name) { return GetPrimitive(name, typeof(T)); }
 	public object GetPrimitive(string name, Type type) {
@@ -413,7 +418,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public JsonObject Add(Dictionary<string, byte> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 	public JsonObject Add(Dictionary<string, int> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 
-	public T Extract<T>(string key, T defaultValue) {
+	public T Extract<T>(string key, T defaultValue = default(T)) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
 			
@@ -479,7 +484,19 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		if (ContainsKey(key)) { data.Remove(key); }
 		return this;
 	}
-	
+
+	public JsonObject Mask(IEnumerable<JsonString> mask) {
+		JsonObject result = new JsonObject();
+		foreach (JsonString str in mask) { result.Add(str, this[str]); }
+		return result;
+	}
+	public JsonObject Mask(IEnumerable<string> mask) {
+		JsonObject result = new JsonObject();
+		foreach (string str in mask) { result.Add(str, this[str]); }
+		return result;
+	}
+
+
 	public JsonObject Clear() { data.Clear(); return this; }
 
 	public JsonObject Set(JsonObject other) {
@@ -1228,6 +1245,153 @@ public static class JsonHelperExtensions {
 		return getter != null;
 	}
 	
+}
+#endregion 
+
+#region Functional Operations
+
+public static class JsonOperations {
+
+	public static JsonObject Negate(this JsonObject obj, JsonArray lim = null) {
+		JsonObject result = new JsonObject();
+
+		if (lim == null) {
+			foreach (var pair in obj) {
+				if (pair.Value.isNumber) { result[pair.Key] = -pair.Value.numVal; }
+			}
+		} else {
+			foreach (var val in lim) {
+				if (val.isString) {
+					result[val.stringVal] = -obj.GetNumber(val.stringVal);
+				}
+			}
+		}
+
+		return result;
+	}
+
+	
+	public static JsonObject Multiply(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
+		JsonObject result = new JsonObject();
+
+		if (lim == null) {
+			foreach (var pair in rhs) {
+				JsonValue val = pair.Value;
+				string key = pair.Key.stringVal;
+				if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
+				if (val.isNumber) { result[key] = lhs.GetNumber(key) * val.numVal; }
+			}
+			
+		} else {
+			foreach (var val in lim) {
+				if (val.isString) {
+					string key = val.stringVal;
+					if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
+					if (val.isNumber) { result[key] = lhs.GetNumber(key) * rhs.GetNumber(key); }
+				}
+			}
+
+		}
+
+		return result;
+	}
+
+	public static double MultiplyRow(this JsonObject lhs, JsonObject rhs) {
+		double d = 0;
+
+		foreach (var pair in rhs) { 
+			if (pair.Value.isNumber) { d += lhs.GetNumber(pair.Key.stringVal) * pair.Value.numVal; }
+		}
+
+		return d;
+	}
+
+	public static JsonObject AddNumbers(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
+		JsonObject result = new JsonObject();
+
+		if (lim == null) {
+			foreach (var pair in lhs) {
+				if (pair.Value.isNumber) { result[pair.Key.stringVal] = pair.Value; }
+			}
+
+			foreach (var pair in rhs) {
+				if (pair.Value.isNumber) { result[pair.Key.stringVal] = result.GetNumber(pair.Key.stringVal) + pair.Value.numVal; }
+			}
+
+		} else {
+			foreach (var val in lim) {
+				if (val.isString) {
+					string key = val.stringVal;
+					result[key] = lhs.GetNumber(key) + rhs.GetNumber(key);
+				}
+			}
+
+		}
+
+		return result;
+	}
+
+	static double Clamp(double val, double min = 0, double max = 1) {
+		if (val < min) { return min; } 
+		else if ( val > max) { return max; } 
+		return val;
+	}
+
+	public static JsonObject CombineRatios(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
+		JsonObject result = new JsonObject();
+
+		if (lim == null) {
+			foreach (var pair in lhs) {
+				if (pair.Value.isNumber) { result[pair.Key.stringVal] = Clamp(pair.Value.numVal); }
+			}
+
+			foreach (var pair in rhs) {
+				if (pair.Value.isNumber) { 
+					double a = result.GetNumber(pair.Key.stringVal);
+					double b = Clamp(pair.Value.numVal);
+
+					result[pair.Key.stringVal] = 1 - (1 - a) * (1 - b);
+				}
+			}
+		} else {
+			foreach (var val in lim) {
+				if (val.isString) {
+					string key = val.stringVal;
+					double a = Clamp(lhs.GetNumber(key));
+					double b = Clamp(rhs.GetNumber(key));
+					result[key] = 1 - (1 - a) * (1 - b);
+				}
+			}
+
+		}
+
+		return result;
+	}
+
+	public static JsonArray GetMatchingKeys(this JsonObject obj, JsonObject rule = null) {
+		if (rule == null) { rule = new JsonObject(); }
+		JsonArray result = new JsonArray();
+
+		string prefix = rule.Extract<string>("prefix", "");
+		string suffix = rule.Extract<string>("suffix", "");
+		string contains = rule.Extract<string>("contains", "");
+
+		foreach (var pair in obj) {
+			string key = pair.Key.stringVal;
+			
+			if ( ("" == prefix || key.StartsWith(prefix)) 
+				&& ("" == suffix || key.EndsWith(suffix))
+				&& ("" == contains || key.Contains(contains))) {
+
+				result.Add(key);
+			}
+
+		}
+
+
+		return result;
+	}
+
 }
 
 #endregion
