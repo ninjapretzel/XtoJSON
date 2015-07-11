@@ -25,16 +25,22 @@ using System.Linq;
 
 #region Abstract/Primary stuff
 
+/// <summary>Enum of all types supported by XtoJSON</summary>
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
+/// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
+	/// <summary> Current version of library </summary>
 	public const string VERSION = "0.3.0";
 
+	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		return jds.Deserialize();
 	}
 
+	/// <summary> Trys to parse a json string into a JsonValue representation. 
+	/// if it fails, catches the exception that was thrown, and returns a null</summary>
 	public static JsonValue TryParse(string json) {
 		try { return Parse(json); }
 		catch {
@@ -42,10 +48,14 @@ public static class Json {
 			return null;
 		}
 	}
-	
+
+
+	/// <summary> Reflect a code object into a JsonValue representation. </summary>
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
-	
+
+	/// <summary> Reflect a JsonValue into a specified type.  </summary>
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
+	/// <summary> Reflect a JsonValue into a specified type. </summary>
 	public static T GetValue<T>(JsonValue val) {
 		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); }
 		else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
@@ -54,13 +64,15 @@ public static class Json {
 		if (o == null) { return default(T); }
 		return (T)o;
 	}
-	
+
+	/// <summary> Reflect information in a JsonObject into a desitnation code object. </summary>
 	public static void ReflectInto(JsonObject source, object destination) {
 		if (source != null) {
 			JsonReflector.ReflectInto(source, destination);
 		}
 	}
 
+	/// <summary> Get the expected type of the reflection of a code object. </summary>
 	public static JsonType ReflectedType(object o) {
 		if (o == null) { return JsonType.Null; }
 		Type t = o.GetType();
@@ -76,42 +88,62 @@ public static class Json {
 
 		return JsonType.Object;
 	}
-	
+
+	/// <summary> More formal name for Parse() </summary>
 	public static JsonValue ParseJson(this string json) { return Parse(json); }
+	/// <summary> More formal name for Parse() </summary>
 	public static JsonValue DeserializeJson(this string json) { return Parse(json); }
 
+	/// <summary> More formal name for Reflect() </summary>
 	public static JsonValue ReflectJson(this object obj) { return Reflect(obj); }
+	/// <summary> More formal name for Reflect() </summary>
 	public static JsonValue SerializeJson(this object obj) { return Reflect(obj); }
 
 }
 
+/// <summary> Base class for all representations of Json values </summary>
 public abstract class JsonValue {
 
 	protected readonly string HORIZONTAL_TAB = "\t";
 	public static int CURRENT_INDENT = 0;
+
+	/// <summary> Base JsonNull null reference </summary>
 	public static readonly JsonValue NULL = JsonNull.instance;
 
+	/// <summary> Is this JsonValue a JsonNumber? </summary>
 	public bool isNumber { get { return JsonType == JsonType.Number; } }
+	/// <summary> Is this JsonValue a JsonString? </summary>
 	public bool isString { get { return JsonType == JsonType.String; } }
+	/// <summary> Is this JsonValue a JsonBoolean? </summary>
 	public bool isBool { get { return JsonType == JsonType.Boolean; } }
+	/// <summary> Is this JsonValue a JsonObject? </summary>
 	public bool isObject { get { return JsonType == JsonType.Object; } }
+	/// <summary> Is this JsonValue a JsonArray? </summary>
 	public bool isArray { get { return JsonType == JsonType.Array; } }
+	/// <summary> Is this a null? </summary>
 	public bool isNull { get { return JsonType == JsonType.Null; } }
 
+	/// <summary> How many items are in this JsonValue, given it is a collection? </summary>
 	public virtual int Count { get { throw new InvalidOperationException("This JsonValue is not a collection"); } }
+	/// <summary> Indexes the JsonValue as if it was a JsonArray </summary>
 	public virtual JsonValue this[int index] { 
 		get { throw new InvalidOperationException("This JsonValue cannot be indexed with an integer"); }
 		set { throw new InvalidOperationException("This JsonValue cannot be indexed with an integer"); }
 	}
+	/// <summary> Indexes the JsonValue as if it was a JsonObject </summary>
 	public virtual JsonValue this[string key] { 
 		get { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 		set { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 	}
 
+	/// <summary> Does this JsonValue have a given key, when treated as a JsonObject </summary>
 	public virtual bool ContainsKey(string key) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
+	/// <summary> Does this JsonValue contain all of the keys in a given array, when treated as a JsonObject </summary>
 	public virtual bool ContainsAllKeys(params string[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
+	/// <summary> Does this JsonValue contain any of the keys in a given array, when treated as a JsonObject </summary>
 	public virtual bool ContainsAnyKeys(params string[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 
+	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a string at a given key </summary>
 	public string GetString(string key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
@@ -119,7 +151,8 @@ public abstract class JsonValue {
 		}
 		return "";
 	}
-	
+
+	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a bool at a given key </summary>
 	public bool GetBoolean(string key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
@@ -128,8 +161,11 @@ public abstract class JsonValue {
 		return false;
 	}
 
+	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a float at a given key. </summary>
 	public float GetFloat(string key) { return (float) GetNumber(key); }
+	/// <summary> Treat this JsonValue as a JsonObject, and retrieve an int at a given key. </summary>
 	public int GetInt(string key) { return (int) GetNumber(key); }
+	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a double at a given key. </summary>
 	public double GetNumber(string key) { 
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
@@ -137,48 +173,70 @@ public abstract class JsonValue {
 		}
 		return 0;
 	}
-
+	/// <summary> Get the boolean value of this JsonValue </summary>
 	public virtual bool boolVal { get { throw new InvalidOperationException("This JsonValue is not a boolean"); } }
+	/// <summary> Get the double value of this JsonValue </summary>
 	public virtual double numVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	/// <summary> Get the float value of this JsonValue </summary>
 	public virtual float floatVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	/// <summary> Get the double value of this JsonValue </summary>
 	public virtual double doubleVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	/// <summary> Get the integer value of this JsonValue </summary>
 	public virtual int intVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	/// <summary> Get the string value of this JsonValue </summary>
 	public virtual string stringVal { get { throw new InvalidOperationException("This JsonValue is not a string"); } }
-	
 
+	/// <summary> Hidden constructor. </summary>
 	internal JsonValue() { }
 
+	/// <summary> Get the JsonType of this JsonValue. Fixed, based on the subclass. </summary>
 	public abstract JsonType JsonType { get; }
+	/// <summary> Get the string representation of this JsonValue. </summary>
 	public abstract override string ToString();
+	/// <summary> Get a pretty string representation of this JsonValue. </summary>
 	public abstract string PrettyPrint();
-	
 
+	/// <summary> Implicit conversion from string to JsonValue </summary>
 	public static implicit operator JsonValue(string val) { return new JsonString(val); }
+	/// <summary> Implicit conversion from bool to JsonValue </summary>
 	public static implicit operator JsonValue(bool val) { return JsonBool.Get(val); }
+	/// <summary> Implicit conversion from double to JsonValue </summary>
 	public static implicit operator JsonValue(double val) { return new JsonNumber(val); }
+	/// <summary> Implicit conversion from float to JsonValue </summary>
 	public static implicit operator JsonValue(float val) { return new JsonNumber(val); }
+	/// <summary> Implicit conversion from int to JsonValue </summary>
 	public static implicit operator JsonValue(int val) { return new JsonNumber(val); }
 
-	
+	/// <summary> Explicit conversion from JsonValue to string </summary>
 	public static explicit operator string(JsonValue val) { return val.stringVal; }
+	/// <summary> Explicit conversion from JsonValue to bool </summary>
 	public static explicit operator bool(JsonValue val) { return val.boolVal; }
+	/// <summary> Explicit conversion from JsonValue to double </summary>
 	public static explicit operator double(JsonValue val) { return val.numVal; }
+	/// <summary> Explicit conversion from JsonValue to decimal </summary>
 	public static explicit operator decimal(JsonValue val) { return (decimal) val.numVal; }
+	/// <summary> Explicit conversion from JsonValue to float </summary>
 	public static explicit operator float(JsonValue val) { return (float) val.numVal; }
+	/// <summary> Explicit conversion from JsonValue to int </summary>
 	public static explicit operator int(JsonValue val) { return (int) val.numVal; }
 	
 }
 
+/// <summary> Base class for JsonValues that hold a group of objects </summary>
 public abstract class JsonValueCollection : JsonValue {
 
 	protected readonly string JsonVALUE_SEPARATOR = ",";
 
+	/// <summary> Hidden internal constructor </summary>
 	internal JsonValueCollection() { }
 
+	/// <summary> Create a pretty string representation of this collection </summary>
 	protected abstract string CollectionToPrettyPrint();
+	/// <summary> Create a compact string representation of this collection </summary>
 	protected abstract string CollectionToString();
+	/// <summary> Create a compact string representation of this collection </summary>
 	public override string ToString() { return BeginMarker + CollectionToString() + EndMarker; }
-
+	/// <summary> Create a pretty string representation of this collection </summary>
 	public override string PrettyPrint() {
 		return Environment.NewLine +
 			"".PadLeft(JsonValue.CURRENT_INDENT, Convert.ToChar(base.HORIZONTAL_TAB)) +
@@ -190,7 +248,9 @@ public abstract class JsonValueCollection : JsonValue {
 			EndMarker;
 	}
 
+	/// <summary> Definition for begining marker character </summary>
 	protected abstract string BeginMarker { get; }
+	/// <summary> Definition for ending marker character </summary>
 	protected abstract string EndMarker { get; }
 
 
@@ -201,12 +261,14 @@ public abstract class JsonValueCollection : JsonValue {
 
 #region Primitives 
 
-//JsonNull with a private constructor and an instance field
+/// <summary> Represents a null as a JsonObject </summary>
 public class JsonNull : JsonValue {
+	/// <summary> internal representatino </summary>
 	public string _value { get { return "null"; } }
+	/// <summary> single instance of null </summary>
 	public static JsonNull instance = new JsonNull();
 
-
+	/// <summary> private constructor </summary>
 	private JsonNull() : base() { }
 
 	public override JsonType JsonType { get { return JsonType.Null; } }
@@ -215,20 +277,25 @@ public class JsonNull : JsonValue {
 
 }
 
-//JsonBool with a private constructor and two instance fields
+/// <summary> bool type represented as a JsonValue. </summary>
 public class JsonBool : JsonValue {
+	/// <summary> internal representation </summary>
 	private string _value;
+
+	/// <summary> 'true' instance </summary>
 	public static JsonBool TRUE = new JsonBool(true);
+	/// <summary> 'false' instance </summary>
 	public static JsonBool FALSE = new JsonBool(false);
 
-
 	public override bool boolVal { get { return _value == "true"; } }
-
 	public override JsonType JsonType { get { return JsonType.Boolean; } }
 
+	/// <summary> Implicit conversion from bool to JsonBool </summary>
 	public static implicit operator JsonBool(bool val) { return val ? TRUE : FALSE; }
+	/// <summary> Use a boolean value to access one of the JsonBool instances </summary>
 	public static JsonBool Get(bool val) { return val ? TRUE : FALSE; }
 
+	/// <summary> Private constructor </summary>
 	private JsonBool(bool value) : base() { _value = (""+value).ToLower(); }
 
 	public override string ToString() { return _value; }
@@ -236,18 +303,21 @@ public class JsonBool : JsonValue {
 
 }
 
+/// <summary> Representation of a number as a JsonValue </summary>
 public class JsonNumber : JsonValue {
 	public override JsonType JsonType { get { return JsonType.Number; } }
 
 #if XtoJSON_StringNumbers
+	/// <summary> internal representation </summary>
 	private string _value;
+
 
 	public override double numVal { get { return Double.Parse(_value); } }
 	public override double doubleVal { get { return Double.Parse(_value); } }
 	public override float floatVal { get { return Single.Parse(_value); } }
 	public override int intVal	{ get { return Int32.Parse(_value); } }
 
-
+	/// <summary> Conversion between strings and numbers </summary>
 	protected static NumberFormatInfo formatter = defaultNumberFormat;
 	static NumberFormatInfo defaultNumberFormat {
 		get {
@@ -256,22 +326,22 @@ public class JsonNumber : JsonValue {
 			return info;
 		}
 	}
-
-	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
-	public static implicit operator JsonNumber(decimal val) { return new JsonNumber(val); }
-	public static implicit operator JsonNumber(float val) { return new JsonNumber(val); }
-	public static implicit operator JsonNumber(int val) { return new JsonNumber(val); }
+	/// <summary> Internal hidden constructor </summary>
 	internal JsonNumber(string value) : base() { _value = value; }
 
+	/// <summary> int constructor </summary>
 	public JsonNumber(int value) : this(value.ToString()) { }
+	/// <summary> double constructor </summary>
 	public JsonNumber(double value) : this(value.ToString(formatter)) { }
+	/// <summary> decimal constructor </summary>
 	public JsonNumber(decimal value) : this(value.ToString(formatter)) { }
+	/// <summary> float constructor </summary>
 	public JsonNumber(float value) : this(value.ToString(formatter)) { }
+	/// <summary> byte constructor </summary>
 	public JsonNumber(byte value) : this(value.ToString()) { }
 
-	public override string ToString() { return _value; }
-	public override string PrettyPrint() { return ToString(); }
 #else
+	/// <summary> Internal representation </summary>
 	private double _value;
 
 	public override double numVal { get { return _value; } }
@@ -279,36 +349,53 @@ public class JsonNumber : JsonValue {
 	public override float floatVal { get { return (float)_value; } }
 	public override int intVal { get { return (int)_value; } }
 
-	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
-	public static implicit operator JsonNumber(decimal val) { return new JsonNumber((double)val); }
-	public static implicit operator JsonNumber(float val) { return new JsonNumber(val); }
-	public static implicit operator JsonNumber(int val) { return new JsonNumber(val); }
+	/// <summary> Internal hidden constructor </summary>
 	internal JsonNumber(double value) : base() { _value = value; }
 
+	/// <summary> int constructor </summary>
 	public JsonNumber(int value) : this((double)value) { }
+	/// <summary> float constructor </summary>
 	public JsonNumber(float value) : this((double)value) { }
+	/// <summary> decimal constructor </summary>
 	public JsonNumber(decimal value) : this((double)value) { }
+	/// <summary> byte constructor </summary>
 	public JsonNumber(byte value) : this((double)value) { }
+
+#endif
 
 	public override string ToString() { return ""+_value; }
 	public override string PrettyPrint() { return ""+_value; }
-
-#endif
+	/// <summary> Implicit conversion from double to JsonNumber </summary>
+	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
+	/// <summary> Implicit conversion from double to JsonNumber </summary>
+	public static implicit operator JsonNumber(decimal val) { return new JsonNumber((double)val); }
+	/// <summary> Implicit conversion from double to JsonNumber </summary>
+	public static implicit operator JsonNumber(float val) { return new JsonNumber(val); }
+	/// <summary> Implicit conversion from double to JsonNumber </summary>
+	public static implicit operator JsonNumber(int val) { return new JsonNumber(val); }
 }
 
+/// <summary> Representation of a string as a JsonValue </summary>
 public class JsonString : JsonValue {
+	/// <summary> Internal representation </summary>
 	private string _value;
 
 	public override string stringVal { get { return _value; } }
 	public override JsonType JsonType { get { return JsonType.String; } }
 
+	/// <summary> Implicit conversion from string to JsonString </summary>
 	public static implicit operator JsonString(string val) { return new JsonString(val); }
+	/// <summary> Implicit conversion from JsonString to string </summary>
 	public static implicit operator string(JsonString val) { return val._value; }
+
+	/// <summary> Constructor </summary>
 	public JsonString(string value) : base() { _value = value; }
 
 	public override string ToString() { return ToJsonString(_value); }
 
+	/// <summary> Get the hash code of this object. Wraps through to the string inside of it. </summary>
 	public override int GetHashCode() { return _value.GetHashCode(); }
+	/// <summary> Is this object equal to another object? </summary>
 	public override bool Equals(object other) { 
 		JsonString otherAsString = other as JsonString;
 		if (otherAsString != null) {
@@ -319,7 +406,7 @@ public class JsonString : JsonValue {
 
 	public override string PrettyPrint() { return ToString(); }
 
-
+	/// <summary> Conversion for representation inside of Json </summary>
 	public static string ToJsonString(string text) {
 		if (text == null) { return "\"\""; }
 		return "\"" + text.JsonEscapeString() + "\"";
@@ -331,13 +418,16 @@ public class JsonString : JsonValue {
 
 
 #region Composites
-
+/// <summary> Representation of arbitrary object types as JsonObjects </summary>
 public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonString, JsonValue>> {
-
+	
 	protected override string BeginMarker { get { return "{"; } }
 	protected override string EndMarker { get { return "}"; } }
 
+	/// <summary> Internal representation of information. </summary>
 	private Dictionary<JsonString, JsonValue> data;
+
+	/// <summary> Separator character </summary>
 	private readonly string NAMEVALUEPAIR_SEPARATOR = ":";
 
 	public override JsonType JsonType { get { return JsonType.Object; } }
@@ -364,12 +454,17 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return true;
 	}
 
+	/// <summary> Default Constructor, creates an empty collection. </summary>
 	public JsonObject() : base() { data = new Dictionary<JsonString, JsonValue>(); }
+	/// <summary> Copy infomration from another JsonObject </summary>
 	public JsonObject(JsonObject src) : this() { Add(src); }
+	/// <summary> Create an JsonObject, setting its data to the parameter. </summary>
 	public JsonObject(Dictionary<JsonString, JsonValue> src) : base() { data = src; }
 
+	/// <summary> Create a duplicate of this object </summary>
 	public JsonObject Clone() { return new JsonObject(this); }
-	
+
+	/// <summary> Add a key:value pair </summary>
 	public JsonObject Add(JsonString name, JsonValue value) {
 		if (!data.ContainsKey(name)) {
 			data.Add(name, value);
@@ -377,12 +472,15 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
+	/// <summary> Adds all of the entries in a Dictionary<string, JsonValue> 
+	/// or other type of Enumerable group of pairs of <string, JsonValue> </summary>
 	public JsonObject AddAll<T>(IEnumerable<KeyValuePair<string, T>> info) where T : JsonValue {
 		foreach (var pair in info) {
 			this[pair.Key] = pair.Value;
 		}
 		return this;
 	}
+	/// <summary> Add all of the entries in a grouping of <string, object> pairs, reflecting each value. </summary>
 	public JsonObject AddAllReflect<T>(IEnumerable<KeyValuePair<string, T>> info) {
 		foreach (var pair in info) {
 			this[pair.Key] = Json.Reflect(pair.Value);
@@ -390,9 +488,12 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
+	/// <summary> Attempt to get a T from a given key. Reflects the JsonValue into a T </summary>
 	public T Get<T>(string key) { return Json.GetValue<T>(this[key]); }
-	
+
+	/// <summary> Attempt to get a primitive type from a given key. </summary>
 	public object GetPrimitive<T>(string name) { return GetPrimitive(name, typeof(T)); }
+	/// <summary> Attempt to get a primitive type from a given key and given type.</summary>
 	public object GetPrimitive(string name, Type type) {
 		JsonValue val = this[name];
 		if (type == typeof(string) 	&& val.isString) { return val.stringVal; }
@@ -407,17 +508,27 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		
 		return null;
 	}
-	
-	
-	public JsonObject Add(JsonObject other) { foreach (var pair in other) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, string> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, double> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, short> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, float> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, long> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, byte> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
-	public JsonObject Add(Dictionary<string, int> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
 
+	/// <summary> Add all information from another JsonObject. </summary>
+	public JsonObject Add(JsonObject other) { foreach (var pair in other) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, string>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, string>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, double>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, double>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, short>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, short>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, float>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, float>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, long>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, long>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, byte>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, byte>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+	/// <summary> Add all information from an IEnumerable<KeyValuePair<string, int>> </summary>
+	public JsonObject Add(IEnumerable<KeyValuePair<string, int>> info) { foreach (var pair in info) { this[pair.Key] = pair.Value; } return this; }
+
+	/// <summary>Try to get a T from this object. 
+	/// Returns the T if it can be found.
+	/// If a T cannot be found, returns a default value. </summary>
 	public T Extract<T>(string key, T defaultValue = default(T)) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
@@ -427,22 +538,17 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return defaultValue;
 	}
 
-	IEnumerator IEnumerable.GetEnumerator() {
-		return data.GetEnumerator();
-	}
-	
-	public IEnumerator<KeyValuePair<JsonString, JsonValue>> GetEnumerator() {
-		return data.GetEnumerator();
-	}
-	
-	public IEnumerator<KeyValuePair<JsonString, JsonValue>> Pairs { 
-		get {
-			return data.GetEnumerator();
-		} 
-	}
+	/// <summary> Returns the internal Dictionary's Enumerator </summary>
+	IEnumerator IEnumerable.GetEnumerator() { return data.GetEnumerator(); }
+	/// <summary> Returns the internal Dictionary's Enumerator</summary>
+	public IEnumerator<KeyValuePair<JsonString, JsonValue>> GetEnumerator() { return data.GetEnumerator(); }
+	/// <summary> Returns the internal Dictionary's Enumerator </summary>
+	public IEnumerator<KeyValuePair<JsonString, JsonValue>> Pairs { get { return data.GetEnumerator(); } }
 
+	/// <summary> Returns the internal dictionary. </summary>
 	public Dictionary<JsonString, JsonValue> GetData() { return data; }
-	
+
+	/// <summary> Gets a collection of all <string, bool> pairs </summary>
 	public Dictionary<string, bool> ToDictOfBool() {
 		Dictionary<string, bool> d = new Dictionary<string, bool>();
 		foreach (var pair in data) {
@@ -450,6 +556,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
+	/// <summary> Gets a collection of all <string, string> pairs </summary>
 	public Dictionary<string, string> ToDictOfString() {
 		Dictionary<string, string> d = new Dictionary<string, string>();
 		foreach (var pair in data) {
@@ -457,6 +564,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
+	/// <summary> Gets a collection of all <string, double> pairs </summary>
 	public Dictionary<string, double> ToDictOfDouble() {
 		Dictionary<string, double> d = new Dictionary<string, double>();
 		foreach (var pair in data) {
@@ -464,6 +572,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
+	/// <summary> Gets a collection of all <string, float> pairs </summary>
 	public Dictionary<string, float> ToDictOfFloat() {
 		Dictionary<string, float> d = new Dictionary<string, float>();
 		foreach (var pair in data) {
@@ -471,6 +580,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
+	/// <summary> Gets a collection of all <string, int> pairs </summary>
 	public Dictionary<string, int> ToDictOfInt() {
 		Dictionary<string, int> d = new Dictionary<string, int>();
 		foreach (var pair in data) {
@@ -478,27 +588,31 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
-	
-	//public void Add(string name, JsonValue value) { data.Add(name, value); }
+
+	/// <summary> Removes the KeyValue pair associated with the given key </summary>
 	public JsonObject Remove(string key) { 
 		if (ContainsKey(key)) { data.Remove(key); }
 		return this;
 	}
 
+	/// <summary> Creates a new JsonObject that has a subset of the original's KeyValue pairs </summary>
 	public JsonObject Mask(IEnumerable<JsonString> mask) {
 		JsonObject result = new JsonObject();
 		foreach (JsonString str in mask) { result.Add(str, this[str]); }
 		return result;
 	}
+	/// <summary> Creates a new JsonObject that has a subset of the original's KeyValue pairs </summary>
 	public JsonObject Mask(IEnumerable<string> mask) {
 		JsonObject result = new JsonObject();
 		foreach (string str in mask) { result.Add(str, this[str]); }
 		return result;
 	}
 
-
+	/// <summary> Removes all KeyValue pairs from the JsonObject. </summary>
 	public JsonObject Clear() { data.Clear(); return this; }
 
+	/// <summary> Takes all of the KeyValue pairs from the other object, 
+	/// and sets this object to have the same values for those keys. </summary>
 	public JsonObject Set(JsonObject other) {
 		foreach (var pair in other) {
 			this[pair.Key] = pair.Value;
@@ -506,6 +620,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
+	/// <summary> Takes all of the pairs from a dictionary, 
+	/// and sets this object to have the JsonValue version of the Values associated with the key </summary>
 	public JsonObject Set<T>(Dictionary<string, T> info) {
 		foreach (var pair in info) {
 			this[pair.Key] = Json.Reflect(pair.Value);
@@ -550,68 +666,75 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 
 }
-
+/// <summary> Representation of an array of objects </summary>
 public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 	protected override string BeginMarker { get { return "["; } }
 	protected override string EndMarker { get { return "]"; } }
-
+	/// <summary> Internal representation of data </summary>
 	protected List<JsonValue> list;
+	/// <summary> Get the internal representation of data </summary>
 	public List<JsonValue> GetList() { return list; }
 	
 	public override JsonType JsonType { get { return JsonType.Array; } }
 	public override int Count { get { return list.Count; } }
-	
-	
 	public override JsonValue this[int index] { 
 		get { return list[index]; }
 		set { list[index] = value; }
 	}
 
+	/// <summary> Default Constructor, creates an empty list </summary>
 	public JsonArray() : base() { list = new List<JsonValue>(); }
+	/// <summary> Creates a new JsonArray using a given list as its internal data. </summary>
 	public JsonArray(List<JsonValue> values) : base() { list = values; }
+	/// <summary> Creates a new JsonArray and copies all elements from another list. </summary>
 	public JsonArray(JsonArray src) : this() { AddAll(src); }
-	
+
+	/// <summary> Creates a copy of this JsonArray </summary>
 	public JsonArray Clone() { return new JsonArray(this); }
-	
-	//For some reason, this function had a 'if !list.Contains(value)' predicate before the add
-	//Figured this was a mistake, but just in case it fucks up.
+
+	/// <summary> Adds a single JsonValue into this list </summary>
 	public JsonArray Add(JsonValue val) { list.Add(val); return this; }
+	/// <summary> Add all JsonValues from a collection </summary>
 	public JsonArray AddAll(IEnumerable<JsonValue> info) {
 		foreach (JsonValue val in info) { Add(val); }
 		return this;
 	}
 
-	
 
+	/// <summary> Add all JsonValues that are contained in a collection </summary>
 	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonValue {
 		foreach (T val in info) { Add( (JsonValue) val ); }
 		return this;
 	}
+	/// <summary> Add reflections of all objects that are contained in a collection </summary>
 	public JsonArray AddAllReflect<T>(IEnumerable<T> info) { 
 		foreach (T val in info) { Add( Json.Reflect(val) ); }
 		return this;
 	}
-	
-	
+
+	/// <summary> Remove all objects from this JsonArray </summary>
 	public JsonArray Clear() { list.Clear(); return this; }
+	/// <summary> Does this array contain a specific JsonValue? </summary>
 	public bool Contains(JsonValue val) { return list.Contains(val); }
+	/// <summary> What is the index of a specific JsonValue </summary>
 	public int IndexOf(JsonValue val) { return list.IndexOf(val); }
+	/// <summary> Remove a given JsonValue from the JsonArray </summary>
 	public JsonArray Remove(JsonValue val) { list.Remove(val); return this; }
+	/// <summary> Insert a JsonValue at a specific position </summary>
 	public JsonArray Insert(int index, JsonValue val) { list.Insert(index, val); return this; }
+	/// <summary> Remove a JsonValue from a specific index </summary>
 	public JsonArray RemoveAt(int index) { list.RemoveAt(index); return this; }
-	
-	
-	IEnumerator IEnumerable.GetEnumerator() {
-		return list.GetEnumerator();
-	}
-	
-	public IEnumerator<JsonValue> GetEnumerator() {
-		return list.GetEnumerator();
-	}
-	
-	
+
+	/// <summary> Returns the internal list's Enumerator </summary>
+	IEnumerator IEnumerable.GetEnumerator() { return list.GetEnumerator(); }
+
+	/// <summary> Returns the internal list's Enumerator </summary>
+	public IEnumerator<JsonValue> GetEnumerator() { return list.GetEnumerator(); }
+
+	/// <summary> Get an array of all JsonNumbers as double values  </summary>
 	public double[] ToDoubleArray() { return ToDoubleList().ToArray(); }
+	/// <summary> Get a list of all JsonNumbers as double values </summary>
 	public List<double> ToDoubleList() {
 		List<double> arr = new List<double>();
 		for (int i = 0; i < Count; i++) {
@@ -621,7 +744,9 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 	
+	/// <summary> Get an array of all JsonNumbers as int values  </summary>
 	public int[] ToIntArray() { return ToIntList().ToArray(); }
+	/// <summary> Get a list of all JsonNumbers as int values  </summary>
 	public List<int> ToIntList() {
 		List<int> arr = new List<int>();
 		for (int i = 0; i < Count; i++) {
@@ -631,7 +756,9 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 	
+	/// <summary> Get an array of all JsonNumbers as float values  </summary>
 	public float[] ToFloatArray() { return ToFloatList().ToArray(); }
+	/// <summary> Get an list of all JsonNumbers as float values  </summary>
 	public List<float> ToFloatList() {
 		List<float> arr = new List<float>();
 		for (int i = 0; i < Count; i++) {
@@ -640,8 +767,10 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
+	/// <summary> Get an array of all JsonBooleans as bool values  </summary>
 	public bool[] ToBoolArray() { return ToBoolList().ToArray(); }
+	/// <summary> Get a list of all JsonBooleans as bool values  </summary>
 	public List<bool> ToBoolList() {
 		List<bool> arr = new List<bool>();
 		for (int i = 0; i < Count; i++) {
@@ -650,8 +779,10 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
+	/// <summary> Get an array of all JsonStrings as string values  </summary>
 	public string[] ToStringArray() { return ToStringList().ToArray(); }
+	/// <summary> Get a list of all JsonStrings as string values  </summary>
 	public List<string> ToStringList() {
 		List<string> arr = new List<string>();
 		for (int i = 0; i < Count; i++) {
@@ -660,8 +791,10 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
+	/// <summary> Get an array of all JsonObjects values  </summary>
 	public JsonObject[] ToJsonObjectArray() { return ToJsonObjectList().ToArray(); }
+	/// <summary> Get a list of all JsonObjects values  </summary>
 	public List<JsonObject> ToJsonObjectList() {
 		List<JsonObject> arr = new List<JsonObject>();
 		for (int i = 0; i < Count; i++) {
@@ -670,8 +803,10 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
+	/// <summary> Get an array of all JsonObjects as T values  </summary>
 	public T[] ToArrayOf<T>() { return ToListOf<T>().ToArray(); }
+	/// <summary> Get a list of all JsonNumbers as T values  </summary>
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
 		ConstructorInfo constructor = type.GetConstructor(new Type[]{}); 
@@ -701,8 +836,10 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
+	/// <summary> Get an array of all JsonObjects as object values  </summary>
 	public object[] ToObjectArray(Type type) { return ToObjectList(type).ToArray(); }
+	/// <summary> Get a list of all JsonObjects as object values  </summary>
 	public List<object> ToObjectList(Type type) {
 		ConstructorInfo constructor = type.GetConstructor(new Type[]{});
 		
@@ -768,13 +905,18 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 #region Reflector 
 
-
+/// <summary> Class containing Reflection Code </summary>
 public class JsonReflector {
 
+	/// <summary> Grab method info for JsonArray.ToArrayOf() </summary>
 	static MethodInfo toArrayOf = typeof(JsonArray).GetMethod("ToArrayOf");
+	/// <summary> Binding flags for easy usage </summary>
 	static BindingFlags publicMembers = BindingFlags.Instance | BindingFlags.Public;
+	/// <summary> Binding flags for easy usage </summary>
 	static BindingFlags publicMember = BindingFlags.Instance | BindingFlags.Public;
-	
+
+	/// <summary> Reflect a JsonValue based on a given type. Attempts to return an object, 
+	/// so return value may be null even if a value type is requested. </summary>
 	public static object GetReflectedValue(JsonValue val, Type destType) {
 		if (val == null) { return null; }
 		object sval = null;
@@ -815,8 +957,8 @@ public class JsonReflector {
 		
 		return sval;
 	}
-	
-	//Reflects info stored in 
+	/// <summary> Reflect value stored in source JsonObject into a destination object. 
+	/// Will recusively reflect parallel objects into their fields when applicable. </summary>
 	public static void ReflectInto(JsonObject source, object destination) {
 		Type type = destination.GetType();
 		if (type.IsValueType) { throw new Exception("Can't reflect Json into a value type. Use Json.GetValue(JsonValue, Type) instead."); }
@@ -909,7 +1051,9 @@ public class JsonReflector {
 		
 		
 	}
-	
+
+	/// <summary> Get a JsonRepresentation of a given code object. 
+	/// Creates a new JsonValue based on what is needed. </summary>
 	public static JsonValue Reflect(object source) {
 		if (source == null) { return null; }
 		Type type = source.GetType();
@@ -1018,23 +1162,33 @@ public class JsonReflector {
 
 #region Deserializer
 
+/// <summary> Class holding logic for parsing Json text into JsonValues 
+/// A new instance of this class is created automatically by Json.Parse() </summary>
 public class JsonDeserializer {
+
+	/// <summary> Json text that is being parsed </summary>
 	private string json;
+	/// <summary> Current position </summary>
 	private int index;
 
+	/// <summary> quick access to the current character </summary>
 	private char next { get { return json[index]; } }
 
+	/// <summary> Constructor. Starts parsing from the begining of a given string </summary>
 	public JsonDeserializer(string str) {
 		index = 0;
 		json = str;
 	}
 
+	/// <summary> Deserialize the Json text, and get back the resulting JsonValue </summary>
 	public JsonValue Deserialize() {
 		index = 0;
 		SkipWhitespace();
 		return ProcessValue();
 	}
 
+	/// <summary> Process the next JsonValue, and recursivly process any other necessary 
+	/// JsonValues stored within. </summary>
 	JsonValue ProcessValue() {
 		if (next == '[') { return ProcessArray(); }
 		if (next == '{') { return ProcessObject(); }
@@ -1090,6 +1244,7 @@ public class JsonDeserializer {
 		return json.Substring(startIndex, index - startIndex);
 	}
 
+	/// <summary> Logic for parsing contents of a JsonArray </summary>
 	JsonArray ProcessArray() {
 		index++;
 		JsonArray array = new JsonArray();
@@ -1108,6 +1263,7 @@ public class JsonDeserializer {
 		return array;
 	}
 
+	/// <summary> Logic for parsing the contents of a JsonObject</summary>
 	JsonObject ProcessObject() {
 		index++;
 		JsonObject obj = new JsonObject();
@@ -1128,6 +1284,7 @@ public class JsonDeserializer {
 		return obj;
 	}
 
+	/// <summary> Logic for moving over characters until the next control character </summary>
 	bool MoveNext() {
 		while (index < json.Length && next != ',' && next != ']' && next != '}') { index++; }
 		
@@ -1155,6 +1312,7 @@ public class JsonDeserializer {
 		return true;
 	}
 
+	/// <summary> Logic for extracting a string value from the text </summary>
 	string ProcessKey() {
 		int startIndex = index + 1;
 		int matchQuote = -1;
@@ -1171,10 +1329,11 @@ public class JsonDeserializer {
 
 	}
 
+	/// <summary> Logic to skip over whitespace until a non whitespace character or the end of the file. </summary>
 	void SkipWhitespaceEnd() {
 		while (index < json.Length && char.IsWhiteSpace(next)) { index++; }
 	}
-
+	/// <summary> Logic to skip to the next non-whitepace character </summary>
 	void SkipWhitespace() {
 		while (char.IsWhiteSpace(next)) { index++; }
 	}
@@ -1185,14 +1344,20 @@ public class JsonDeserializer {
 
 #region Helpers
 
+/// <summary> Class containing some helper functions. </summary>
 public static class JsonHelperExtensions {
 
+	/// <summary> Escape characters to escape inside of Json text </summary>
 	static string[] TOESCAPE = new string[] { "\\", "\"", "\b", "\f", "\n", "\r", "\t" };
 
+	/// <summary> Is the type of an object is a given type? </summary>
 	public static bool IsOf(this object o, Type t) { return o.GetType() == t; }
+	/// <summary> Is an object is of an enum type? </summary>
 	public static bool IsTypeOfEnum(this object o) { return o.GetType().BaseType == typeof(System.Enum); }
+	/// <summary> Is an object of an array type? </summary>
 	public static bool IsTypeOfArray(this object o) { return o.GetType().IsArray; }
 
+	/// <summary> Replace all escapeable characters with their escaped versions. </summary>
 	public static string JsonEscapeString(this string str) {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
@@ -1202,6 +1367,7 @@ public static class JsonHelperExtensions {
 		return s;
 	}
 
+	/// <summary> Replace all escaped characters with their unescaped versions. </summary>
 	public static string JsonUnescapeString(this string str) {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
@@ -1211,7 +1377,7 @@ public static class JsonHelperExtensions {
 		return s;
 	}
 
-
+	/// <summary> Array of numeric types </summary>
 	static Type[] numericTypes = new Type[] { 
 		typeof(int), 
 		typeof(short), 
@@ -1220,12 +1386,13 @@ public static class JsonHelperExtensions {
 		typeof(decimal), 
 		typeof(byte)
 	};
-	
+
+	/// <summary> is a type a numeric type? </summary>
 	public static bool IsNumeric(this Type type) {
 		return numericTypes.Contains(type);
 	}
 	
-	///Returns a new instance of an object, from the empty constructor if it exists.
+	/// <summary> Call the constructor of a Type, calling an empty constructor if it exists. </summary>
 	public static object GetNewInstance(this Type type) {
 		ConstructorInfo constructor = type.GetConstructor(new Type[] {});
 		if (constructor != null) {
@@ -1233,13 +1400,14 @@ public static class JsonHelperExtensions {
 		}
 		return null;
 	}
-	
-	
+
+	/// <summary> See if a property has a SET function </summary>
 	public static bool IsWritable(this PropertyInfo p) {
 		MethodInfo setter = p.GetSetMethod();
 		return setter != null;
 	}
-	
+
+	/// <summary> See if a property has a GET function </summary>
 	public static bool IsReadable(this PropertyInfo p) {
 		MethodInfo getter = p.GetGetMethod();
 		return getter != null;
@@ -1250,8 +1418,14 @@ public static class JsonHelperExtensions {
 
 #region Functional Operations
 
+/// <summary> Class containing 'functional' operations 
+/// these operations process numeric information between multiple JsonObjects </summary>
 public static class JsonOperations {
 
+	/// <summary> Get a version of the given object with all of its numbers' sign changed. 
+	/// lim is an optional parameter that limits what fields are used
+	/// if present, all of the strings in it will be processed into the result.
+	/// if absent, all of the strings that are mapped to numbers will be processed into the result. </summary>
 	public static JsonObject Negate(this JsonObject obj, JsonArray lim = null) {
 		JsonObject result = new JsonObject();
 
@@ -1270,7 +1444,12 @@ public static class JsonOperations {
 		return result;
 	}
 
-	
+	/// <summary> Multiply the left side object (as a 'vector') by the right hand side object (as a 'matrix').
+	/// a 'vector' is a JsonObject with only string:float value pairs considered.
+	/// a 'matrix' is a JsonObject with only string:'vector' pairs considered.
+	/// Optionally, another parameter can be provided, lim.
+	/// lim defines what the 'dimensions' of the multiplication are.
+	/// if not present, all 'dimensions' are used. </summary>
 	public static JsonObject Multiply(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
 		JsonObject result = new JsonObject();
 
@@ -1296,6 +1475,7 @@ public static class JsonOperations {
 		return result;
 	}
 
+	/// <summary> Calculates one result of a multiplication of one 'vector' times one 'row' of a matrix </summary>
 	public static double MultiplyRow(this JsonObject lhs, JsonObject rhs) {
 		double d = 0;
 
@@ -1306,6 +1486,11 @@ public static class JsonOperations {
 		return d;
 	}
 
+	/// <summary> Creates the result of the left 'vector' plus the right 'vector' 
+	/// lim is an optional parameter that can be provided to define the 'dimensions' that are used.
+	/// if present, each string contained will be a 'dimension' in the result.
+	/// if absent, the full range of each 'vector' will be considered.
+	/// </summary>
 	public static JsonObject AddNumbers(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
 		JsonObject result = new JsonObject();
 
@@ -1331,12 +1516,16 @@ public static class JsonOperations {
 		return result;
 	}
 
+	/// <summary> Clamp a value. by default range is [0, 1]</summary>
 	static double Clamp(double val, double min = 0, double max = 1) {
 		if (val < min) { return min; } 
 		else if ( val > max) { return max; } 
 		return val;
 	}
 
+	/// <summary> Combine two 'vector' JsonObjects as if each number is a ratio between [0, 1]
+	/// combines each 'dimension' as (1 - (1 - a) * (1 - b))
+	/// so if one vector has .5 and the other one has .2, the result will be .6 </summary>
 	public static JsonObject CombineRatios(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
 		JsonObject result = new JsonObject();
 
@@ -1368,6 +1557,7 @@ public static class JsonOperations {
 		return result;
 	}
 
+	/// <summary> Gets a list of keys from a JsonObject that match a given rule </summary>
 	public static JsonArray GetMatchingKeys(this JsonObject obj, JsonObject rule = null) {
 		if (rule == null) { rule = new JsonObject(); }
 		JsonArray result = new JsonArray();
