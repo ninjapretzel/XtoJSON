@@ -1444,6 +1444,58 @@ public static class JsonOperations {
 		return result;
 	}
 
+	/// <summary> Sums numbers that are inside of a JsonObject.
+	/// Optionally, another parameter can be provided, lim.
+	/// lim defines what keys are used in the sum. </summary>
+	public static double SumOfNumbers(this JsonObject thing, JsonArray lim = null) {
+		double sum = 0;
+
+		if (lim == null) {
+			foreach (var pair in thing) {
+				if (pair.Value.isNumber) { sum += pair.Value.numVal; }
+			}
+		} else {
+			foreach (var key in lim) {
+				if (key.isString) {
+					var val = thing[key.stringVal];
+					if (val.isNumber) { sum += val.numVal; }
+				}
+			}
+		}
+
+		return sum;
+	}
+
+	/// <summary>
+	/// Multiply two 'vectors' componentwise, and return the result.
+	/// Optionally, another parameter can be provided, lim
+	/// lim defines which dimensions are present in the result.
+	/// without lim, the result contains the INTERSECTION between lhs and rhs as vectors.
+	/// </summary>
+	public static JsonObject Scale(this JsonObject lhs, JsonObject rhs, JsonArray lim = null) {
+		JsonObject result = new JsonObject();
+
+		if (lim == null) {
+			foreach (var lpair in lhs) {
+				if (lpair.Value.isNumber) {
+					var rval = rhs[lpair.Key.stringVal];
+					if (rval.isNumber) {
+						result[lpair.Key.stringVal] = rval.numVal * lpair.Value.numVal;
+					}
+				}
+			}
+		} else {
+			foreach (var val in lim) {
+				if (val.isString) {
+					string key = val.stringVal;
+					result[key] = lhs.GetFloat(key) * rhs.GetFloat(key);
+				}
+			}
+		}
+
+		return result;
+	}
+
 	/// <summary> Multiply the left side object (as a 'vector') by the right hand side object (as a 'matrix').
 	/// a 'vector' is a JsonObject with only string:float value pairs considered.
 	/// a 'matrix' is a JsonObject with only string:'vector' pairs considered.
@@ -1474,6 +1526,8 @@ public static class JsonOperations {
 
 		return result;
 	}
+
+
 
 	/// <summary> Calculates one result of a multiplication of one 'vector' times one 'row' of a matrix </summary>
 	public static double MultiplyRow(this JsonObject lhs, JsonObject rhs) {
