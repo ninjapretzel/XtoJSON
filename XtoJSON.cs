@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.3.0";
+	public const string VERSION = "0.3.1";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -1477,7 +1477,10 @@ public static class JsonOperations {
 
 		if (lim == null) {
 			foreach (var lpair in lhs) {
-				if (lpair.Value.isNumber) {
+				string key = lpair.Key.stringVal;
+				var lval = lpair.Value;
+
+				if (lval != null && lpair.Value.isNumber) {
 					var rval = rhs[lpair.Key.stringVal];
 					if (rval.isNumber) {
 						result[lpair.Key.stringVal] = rval.numVal * lpair.Value.numVal;
