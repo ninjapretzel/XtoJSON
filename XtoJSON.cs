@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.3.1";
+	public const string VERSION = "0.3.2";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -434,10 +434,14 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public override int Count { get { return data.Count; } }
 	public override JsonValue this[string key] {
 		get { 
+			if (key == null) { return NULL; }
 			if (data.ContainsKey(key)) { return data[key]; } 
 			return NULL; 
 		}
-		set { data[key] = value; }
+		set { 
+			if (value == null) { data.Remove(key); }
+			data[key] = value; 
+		}
 	}
 
 	public override bool ContainsKey(string key) { return data.ContainsKey(key); }
