@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.4.0";
+	public const string VERSION = "0.4.1";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -292,6 +292,7 @@ public abstract class JsonValue {
 				//Re-use code for '==' for 'primitive' types.
 				return (this == b);
 			case JsonType.Array:
+				if (b == null) { return false; }
 				if (b is JsonArray) {
 					JsonArray arr = b as JsonArray;
 					if (Count != arr.Count) { return false; }
@@ -302,6 +303,7 @@ public abstract class JsonValue {
 				}
 				return false;
 			case JsonType.Object:
+				if (b == null) { return false; }
 				if (b is JsonObject) {
 					JsonObject obj = b as JsonObject;
 					if (Count != obj.Count) { return false; }
