@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.3.3";
+	public const string VERSION = "0.4.0";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -219,6 +219,111 @@ public abstract class JsonValue {
 	public static explicit operator float(JsonValue val) { return (float) val.numVal; }
 	/// <summary> Explicit conversion from JsonValue to int </summary>
 	public static explicit operator int(JsonValue val) { return (int) val.numVal; }
+
+	public static bool operator !=(JsonValue a, object b) { return !(a == b); }
+
+
+	static double NUMBER_TOLERANCE = 1E-16;
+	/// <summary> Override for == operator.
+	/// If a and b are of compatible types, attempts to compare their equality.
+	/// It first checks their references, and returns true if both are the same address.
+	/// 
+	/// Then:
+	/// If they are numbers, it takes their difference over their sum, and returns true if it differes by a very small percentage (1E-16).
+	/// If they are bools or strings, in compares their internal representations.
+	/// If one is null, it checks against the JsonNull special value.
+	/// </summary>
+	public static bool operator ==(JsonValue a, object b) {
+		//Catch 'same object' comparisons early.
+		if (ReferenceEquals(a, b)) { return true; }
+		
+		switch (a.JsonType) {
+			case JsonType.Number:
+				if (b == null) { return false; }
+				//Numbers compared within tolerance
+				//Default compared to double.NaN
+				double val = double.NaN;
+				if (b.GetType().IsNumeric()) { val = JsonHelpers.GetNumericValue(b); }
+				if (b is JsonNumber) { val = (b as JsonNumber).doubleVal; }
+				if (val == double.NaN) { return false; }
+
+				double s = a.doubleVal + val;
+				double d = a.doubleVal - val;
+				if (s == 0) { return false; }
+
+				d /= s; 
+				if (d < 0) { d *= -1; }
+
+				return d < NUMBER_TOLERANCE;
+			case JsonType.Boolean: // bools compared by true/false equivelence
+				if (b == null) { return false; }
+				if (b is bool) { return a.boolVal == ((bool)b); }
+				if (b is JsonBool) { return a.boolVal == ((JsonBool)b).boolVal; }
+				
+				return false;
+			case JsonType.String: // strings compared by internal representations via 'string == string'
+				if (b == null) { return false; }
+				if (b is string) { return a.stringVal == ((string)b); }
+				if (b is JsonString) { return a.stringVal == ((JsonString)b).stringVal; }
+				
+				return false;
+			case JsonType.Array:
+			case JsonType.Object:
+				// Objects and Arrays with different addresses are not considered equal by '=='
+				
+				return false;
+			default: 
+				// Default - a is JsonNull.instance
+				
+				return (b == null || b == JsonNull.instance);
+		}
+
+	}
+
+	/// <summary>
+	/// Equality Comparison from any JsonValue type to any object
+	/// </summary>
+	public override bool Equals(object b) {
+		if (ReferenceEquals(this, b)) { return true; }
+		switch (JsonType) {
+			case JsonType.Number:
+			case JsonType.Boolean:
+			case JsonType.String:
+				//Re-use code for '==' for 'primitive' types.
+				return (this == b);
+			case JsonType.Array:
+				if (b is JsonArray) {
+					JsonArray arr = b as JsonArray;
+					if (Count != arr.Count) { return false; }
+					for (int i = 0; i < Count; i++) {
+						if (this[i] != arr[i]) { return false; }
+					}
+					return true;
+				}
+				return false;
+			case JsonType.Object:
+				if (b is JsonObject) {
+					JsonObject obj = b as JsonObject;
+					if (Count != obj.Count) { return false; }
+					int i = 0;
+					foreach (var pair in obj) {
+						string key = pair.Key.stringVal;
+						JsonValue val = pair.Value;
+						if (!this.ContainsKey(key)) { return false; }
+						if (val != this[key]) { return false; }
+						i++;
+					}
+					return i == Count;
+				}
+				return false;
+			default: // Default - a is JsonNull.instance
+				return (b == null || b == JsonNull.instance);
+		}
+	}
+
+	public override int GetHashCode() {
+		return base.GetHashCode();
+	}
 	
 }
 
@@ -361,10 +466,13 @@ public class JsonNumber : JsonValue {
 	/// <summary> byte constructor </summary>
 	public JsonNumber(byte value) : this((double)value) { }
 
+	
+
 #endif
 
 	public override string ToString() { return ""+_value; }
 	public override string PrettyPrint() { return ""+_value; }
+	
 	/// <summary> Implicit conversion from double to JsonNumber </summary>
 	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
 	/// <summary> Implicit conversion from double to JsonNumber </summary>
@@ -373,6 +481,7 @@ public class JsonNumber : JsonValue {
 	public static implicit operator JsonNumber(float val) { return new JsonNumber(val); }
 	/// <summary> Implicit conversion from double to JsonNumber </summary>
 	public static implicit operator JsonNumber(int val) { return new JsonNumber(val); }
+
 }
 
 /// <summary> Representation of a string as a JsonValue </summary>
@@ -395,14 +504,6 @@ public class JsonString : JsonValue {
 
 	/// <summary> Get the hash code of this object. Wraps through to the string inside of it. </summary>
 	public override int GetHashCode() { return _value.GetHashCode(); }
-	/// <summary> Is this object equal to another object? </summary>
-	public override bool Equals(object other) { 
-		JsonString otherAsString = other as JsonString;
-		if (otherAsString != null) {
-			return _value == otherAsString._value;
-		}
-		return _value.Equals(other); 
-	}
 
 	public override string PrettyPrint() { return ToString(); }
 
@@ -533,7 +634,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary>Try to get a T from this object. 
 	/// Returns the T if it can be found.
 	/// If a T cannot be found, returns a default value. </summary>
-	public T Extract<T>(string key, T defaultValue = default(T)) {
+	public T Extract<T>( string key, T defaultValue = default(T) ) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
 			
@@ -543,7 +644,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	}
 
 	/// <summary> Returns the internal Dictionary's Enumerator </summary>
-	IEnumerator IEnumerable.GetEnumerator() { return data.GetEnumerator(); }
+	IEnumerator IEnumerable.GetEnumerator() { return data.GetEnumerator(); } 
 	/// <summary> Returns the internal Dictionary's Enumerator</summary>
 	public IEnumerator<KeyValuePair<JsonString, JsonValue>> GetEnumerator() { return data.GetEnumerator(); }
 	/// <summary> Returns the internal Dictionary's Enumerator </summary>
@@ -615,6 +716,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Removes all KeyValue pairs from the JsonObject. </summary>
 	public JsonObject Clear() { data.Clear(); return this; }
 
+	
+
 	/// <summary> Takes all of the KeyValue pairs from the other object, 
 	/// and sets this object to have the same values for those keys. </summary>
 	public JsonObject Set(JsonObject other) {
@@ -632,6 +735,27 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return this;
 	}
+
+	
+	/// <summary>
+	/// Compares keys between two JsonObjects
+	/// If the values of the keys are the same (including 'not being there'), returns true.
+	/// If any of the keys exists in one but not the other, or values at the keys are different, returns false.
+	/// Optionally, an array of keys can be provided to tell it what set to check.
+	/// </summary>
+	/// <param name="other">Other object to chec </param>
+	/// <param name="stuff">Subset of keys to check. Optional</param>
+	/// <returns></returns>
+	public bool Same(JsonObject other, string[] stuff = null) {
+		if (stuff == null) { return this.Equals(other); }
+		foreach (string s in stuff) {
+			if (ContainsKey(s) && other.ContainsKey(s)) {
+				if (this[s] != other[s]) { return false; }
+			}
+		}
+		return true;
+	}
+
 
 	protected override string CollectionToPrettyPrint() {
 		JsonValue.CURRENT_INDENT++;
@@ -735,6 +859,11 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 	/// <summary> Returns the internal list's Enumerator </summary>
 	public IEnumerator<JsonValue> GetEnumerator() { return list.GetEnumerator(); }
+
+	public static implicit operator string[](JsonArray a) { return a.ToStringArray(); }
+	public static implicit operator double[](JsonArray a) { return a.ToDoubleArray(); }
+	public static implicit operator float[](JsonArray a) { return a.ToFloatArray(); }
+	public static implicit operator int[](JsonArray a) { return a.ToIntArray(); }
 
 	/// <summary> Get an array of all JsonNumbers as double values  </summary>
 	public double[] ToDoubleArray() { return ToDoubleList().ToArray(); }
@@ -869,8 +998,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 		return arr;
 	}
-	
-	
 	
 	protected override string CollectionToPrettyPrint() {
 		JsonValue.CURRENT_INDENT++;
@@ -1349,7 +1476,7 @@ public class JsonDeserializer {
 #region Helpers
 
 /// <summary> Class containing some helper functions. </summary>
-public static class JsonHelperExtensions {
+public static class JsonHelpers {
 
 	/// <summary> Escape characters to escape inside of Json text </summary>
 	static string[] TOESCAPE = new string[] { "\\", "\"", "\b", "\f", "\n", "\r", "\t" };
@@ -1383,17 +1510,30 @@ public static class JsonHelperExtensions {
 
 	/// <summary> Array of numeric types </summary>
 	static Type[] numericTypes = new Type[] { 
-		typeof(int), 
-		typeof(short), 
-		typeof(long),
 		typeof(double), 
+		typeof(int), 
+		typeof(float), 
+		typeof(long),
 		typeof(decimal), 
-		typeof(byte)
+		typeof(byte),
+		typeof(short), 
 	};
 
 	/// <summary> is a type a numeric type? </summary>
 	public static bool IsNumeric(this Type type) {
 		return numericTypes.Contains(type);
+	}
+
+	public static double GetNumericValue(object obj) {
+		if (obj.GetType() == typeof(double)) { return (double)obj; }
+		if (obj.GetType() == typeof(int)) { return (double)(int)obj; }
+		if (obj.GetType() == typeof(float)) { return (double)(float)obj; }
+		if (obj.GetType() == typeof(long)) { return (double)(long)obj; }
+		if (obj.GetType() == typeof(decimal)) { return (double)(decimal)obj; }
+		if (obj.GetType() == typeof(byte)) { return (double)(byte)obj; }
+		if (obj.GetType() == typeof(short)) { return (double)(short)obj; }
+
+		return 0;
 	}
 	
 	/// <summary> Call the constructor of a Type, calling an empty constructor if it exists. </summary>
@@ -1648,47 +1788,5 @@ public static class JsonOperations {
 }
 
 #endregion
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
