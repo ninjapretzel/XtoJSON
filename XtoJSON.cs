@@ -542,8 +542,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 			return NULL; 
 		}
 		set { 
-			if (value == null) { data.Remove(key); }
-			data[key] = value; 
+			if (value == null && data.ContainsKey(key)) { data.Remove(key); }
+			if (value != null) { data[key] = value; }
 		}
 	}
 
@@ -573,9 +573,13 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 	/// <summary> Add a key:value pair </summary>
 	public JsonObject Add(JsonString name, JsonValue value) {
+		if (value == null) { return this; }
+		if (value == JsonNull.instance) { return this; }
+
 		if (!data.ContainsKey(name)) {
 			data.Add(name, value);
 		}
+
 		return this;
 	}
 
