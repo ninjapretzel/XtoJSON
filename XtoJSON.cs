@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.4.2";
+	public const string VERSION = "0.4.3";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -647,6 +647,14 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 			if (val.JsonType == Json.ReflectedType(defaultValue) ) { return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
+	}
+
+	public JsonArray ToJsonArray() {
+		JsonArray arr = new JsonArray();
+		foreach (var pair in this) { 
+			arr.Add(pair.Value);
+		}
+		return arr;
 	}
 
 	/// <summary> Returns the internal Dictionary's Enumerator </summary>
