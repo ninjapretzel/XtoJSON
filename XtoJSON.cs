@@ -31,7 +31,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.4.3";
+	public const string VERSION = "0.4.4";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -413,6 +413,15 @@ public class JsonBool : JsonValue {
 /// <summary> Representation of a number as a JsonValue </summary>
 public class JsonNumber : JsonValue {
 	public override JsonType JsonType { get { return JsonType.Number; } }
+	/// <summary> Conversion between strings and numbers </summary>
+	protected static NumberFormatInfo formatter = defaultNumberFormat;
+	static NumberFormatInfo defaultNumberFormat {
+		get {
+			NumberFormatInfo info = new NumberFormatInfo();
+			info.NumberDecimalSeparator = ".";
+			return info;
+		}
+	}
 
 #if XtoJSON_StringNumbers
 	/// <summary> internal representation </summary>
@@ -424,15 +433,7 @@ public class JsonNumber : JsonValue {
 	public override float floatVal { get { return Single.Parse(_value); } }
 	public override int intVal	{ get { return Int32.Parse(_value); } }
 
-	/// <summary> Conversion between strings and numbers </summary>
-	protected static NumberFormatInfo formatter = defaultNumberFormat;
-	static NumberFormatInfo defaultNumberFormat {
-		get {
-			NumberFormatInfo info = new NumberFormatInfo();
-			info.NumberDecimalSeparator = ".";
-			return info;
-		}
-	}
+	
 	/// <summary> Internal hidden constructor </summary>
 	internal JsonNumber(string value) : base() { _value = value; }
 
@@ -447,6 +448,9 @@ public class JsonNumber : JsonValue {
 	/// <summary> byte constructor </summary>
 	public JsonNumber(byte value) : this(value.ToString()) { }
 
+	public override string ToString() { return ""+_value; }
+	public override string PrettyPrint() { return ""+_value; }
+	
 #else
 	/// <summary> Internal representation </summary>
 	private double _value;
@@ -460,21 +464,19 @@ public class JsonNumber : JsonValue {
 	internal JsonNumber(double value) : base() { _value = value; }
 
 	/// <summary> int constructor </summary>
-	public JsonNumber(int value) : this((double)value) { }
+	public JsonNumber(int value) : this(Double.Parse(""+value)) { }
 	/// <summary> float constructor </summary>
-	public JsonNumber(float value) : this((double)value) { }
+	public JsonNumber(float value) : this(Double.Parse("" + value)) { }
 	/// <summary> decimal constructor </summary>
-	public JsonNumber(decimal value) : this((double)value) { }
+	public JsonNumber(decimal value) : this(Double.Parse("" + value)) { }
 	/// <summary> byte constructor </summary>
-	public JsonNumber(byte value) : this((double)value) { }
+	public JsonNumber(byte value) : this(Double.Parse(""+value)) { }
 
-	
+	public override string ToString() { return _value.ToString(formatter); }
+	public override string PrettyPrint() { return _value.ToString(formatter); }
 
 #endif
 
-	public override string ToString() { return ""+_value; }
-	public override string PrettyPrint() { return ""+_value; }
-	
 	/// <summary> Implicit conversion from double to JsonNumber </summary>
 	public static implicit operator JsonNumber(double val) { return new JsonNumber(val); }
 	/// <summary> Implicit conversion from double to JsonNumber </summary>
@@ -514,6 +516,7 @@ public class JsonString : JsonValue {
 		if (text == null) { return "\"\""; }
 		return "\"" + text.JsonEscapeString() + "\"";
 	}
+
 }
 
 
