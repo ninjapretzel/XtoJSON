@@ -1,3 +1,22 @@
+/*	XtoJSON
+	Lightweight JSON Library for C#
+	Copyright (C) 2015  Jonathan Cohen
+	Contact: ninjapretzel@yahoo.com
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*/
+
 //Definition Flags:
 
 //XtoJSON_StrictCommaRules 
@@ -9,8 +28,8 @@
 
 //XtoJSON_StringNumbers
 //	Enabled - numbers are stored internally as a string value, and are converted to and from number types
-//	Disabled - numbers are stored internally as a double value.
-//May have minor performance implications.
+//	Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
+//May have minor performance implications when enabled.
 
 using System;
 using System.Collections;
@@ -22,7 +41,6 @@ using System.Text.RegularExpressions;
 using System.Linq;
 
 
-
 #region Abstract/Primary stuff
 
 /// <summary>Enum of all types supported by XtoJSON</summary>
@@ -31,7 +49,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.4.4";
+	public const string VERSION = "0.5.0";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
