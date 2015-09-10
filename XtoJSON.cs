@@ -1161,6 +1161,7 @@ public class JsonReflector {
 			
 			PropertyInfo property = type.GetProperty(key, publicMember);
 			if (property != null && property.IsWritable() && property.IsReadable()) {
+				
 				Type destType = property.PropertyType;
 				MethodInfo setMethod = property.GetSetMethod();
 				
@@ -1177,6 +1178,7 @@ public class JsonReflector {
 			
 			FieldInfo field = type.GetField(key, publicMember);
 			if (field != null) {
+				
 				Type destType = field.FieldType;
 				
 				object sval = GetReflectedValue(val, destType);
@@ -1270,6 +1272,7 @@ public class JsonReflector {
 
 			if (keys != null 
 					&& mapper != null
+					&& !mapper.IsObsolete()
 					&& typeof(IEnumerable<string>).IsAssignableFrom(keys.PropertyType)) {
 				
 				MethodInfo keysGet = keys.GetGetMethod();
@@ -1298,10 +1301,17 @@ public class JsonReflector {
 			}
 			
 			foreach (PropertyInfo property in properties) {
+
 				if (property.Name == "Item"
 						|| blacklist.Contains<string>(property.Name) 
 						|| !property.IsWritable() 
-						|| !property.IsReadable()) { continue; }
+						|| !property.IsReadable()
+						|| property.IsObsolete()) { continue; }
+
+#if UNITY_5
+				//Why did they not mark this obsolete? Can't automatically detect it...
+				if (property.Name == "useConeFriction") { continue; }
+#endif
 
 				MethodInfo propGet = property.GetGetMethod();
 				
@@ -1310,7 +1320,8 @@ public class JsonReflector {
 			}
 			
 			foreach (FieldInfo field in fields) {
-				if (blacklist.Contains<string>(field.Name)) { continue; }
+				if (blacklist.Contains<string>(field.Name)
+					|| field.IsObsolete()) { continue; }
 				
 				object grabbed = field.GetValue(source);
 				obj.Add(field.Name, Reflect(grabbed));
@@ -1571,6 +1582,10 @@ public static class JsonHelpers {
 		return 0;
 	}
 	
+	public static bool IsObsolete(this MemberInfo info) {
+		return System.Attribute.GetCustomAttribute(info, typeof(System.ObsoleteAttribute)) != null;
+	}
+
 	/// <summary> Call the constructor of a Type, calling an empty constructor if it exists. </summary>
 	public static object GetNewInstance(this Type type) {
 		ConstructorInfo constructor = type.GetConstructor(new Type[] {});
