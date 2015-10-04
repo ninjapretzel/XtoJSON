@@ -40,6 +40,13 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5
+using UnityEngine;
+
+
+#endif
+
+
 
 #region Abstract/Primary stuff
 
@@ -49,7 +56,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.5.0";
+	public const string VERSION = "0.5.1";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -1493,7 +1500,7 @@ public class JsonDeserializer {
 	string ProcessKey() {
 		int startIndex = index + 1;
 		int matchQuote = -1;
-		while (json[index++] != ':') { 
+		while (json[index++] != ':' || matchQuote == -1) { 
 			if (json[index] == '\"' && json[index-1] != '\\') {
 				matchQuote = index;
 			}
@@ -1503,7 +1510,6 @@ public class JsonDeserializer {
 		string result = json.Substring(startIndex, matchQuote - startIndex).TrimEnd();
 		//Debug.Log("ProcessKey: " + startIndex + "-" + index + " [" + result + "]");
 		return result;
-
 	}
 
 	/// <summary> Logic to skip over whitespace until a non whitespace character or the end of the file. </summary>
