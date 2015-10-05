@@ -640,6 +640,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		if (type == typeof(double) 	&& val.isNumber) { return val.numVal; } 
 		if (type == typeof(int) 	&& val.isNumber) { return val.intVal; } 
 		if (type == typeof(bool) 	&& val.isBool) { return val.boolVal; }
+		if (type.IsNumeric() && val.isString) {
+			double numVal = 0;
+			double.TryParse(val.stringVal, out numVal);
+			return Convert.ChangeType(numVal, type);
+		}
 		
 		if (type.IsValueType && val.isObject) {
 			return Json.GetValue(val, type);
@@ -1094,6 +1099,11 @@ public class JsonReflector {
 		if (val == null) { return null; }
 		object sval = null;
 		if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
+		else if (val.isString && destType.IsNumeric()) { 
+			double numVal = 0;
+			double.TryParse(val.stringVal, out numVal);
+			sval = Convert.ChangeType(numVal, destType);
+		}
 		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; }
 		else if (val.isNumber && destType == typeof(float)) { sval = (float) val.numVal; }
 		else if (val.isNumber && destType == typeof(int)) { sval = (int) val.numVal; }
