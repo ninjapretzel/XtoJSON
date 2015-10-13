@@ -137,7 +137,15 @@ public abstract class JsonValue {
 	public static readonly JsonValue NULL = JsonNull.instance;
 
 	/// <summary> Is this JsonValue a JsonNumber? </summary>
-	public bool isNumber { get { return JsonType == JsonType.Number; } }
+	public bool isNumber { 
+		get {
+			if (JsonType == JsonType.String) {
+				double d = 0;
+				return Double.TryParse(stringVal, out d);
+			}
+			return JsonType == JsonType.Number; 
+		} 
+	}
 	/// <summary> Is this JsonValue a JsonString? </summary>
 	public bool isString { get { return JsonType == JsonType.String; } }
 	/// <summary> Is this JsonValue a JsonBoolean? </summary>
@@ -523,6 +531,20 @@ public class JsonNumber : JsonValue {
 public class JsonString : JsonValue {
 	/// <summary> Internal representation </summary>
 	private string _value;
+
+	public override double numVal {
+		get {
+			double d = 0;
+			if (Double.TryParse(_value, out d)) {
+				return d;
+			}
+			return base.numVal;
+		}
+	}
+
+	public override double doubleVal { get { return numVal; } }
+	public override int intVal { get { return (int) numVal; } }
+	public override float floatVal { get { return (float) numVal; } }
 
 	public override string stringVal { get { return _value; } }
 	public override JsonType JsonType { get { return JsonType.String; } }
