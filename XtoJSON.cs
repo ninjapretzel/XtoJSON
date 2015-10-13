@@ -58,6 +58,7 @@ public static class Json {
 	/// <summary> Current version of library </summary>
 	public const string VERSION = "0.5.1";
 
+
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
@@ -104,7 +105,7 @@ public static class Json {
 		if (t.IsArray) { return JsonType.Array; }
 		if (t == typeof(string)) { return JsonType.String; }
 		if (t == typeof(bool)) { return JsonType.Boolean; }
-		
+
 		if (t == typeof(int)
 			|| t == typeof(byte)
 			|| t == typeof(float)
@@ -259,12 +260,20 @@ public abstract class JsonValue {
 	/// If one is null, it checks against the JsonNull special value.
 	/// </summary>
 	public static bool operator ==(JsonValue a, object b) {
-		//Catch 'same object' comparisons early.
+		//Handle 'same object' comparisons early.
 		if (ReferenceEquals(a, b)) { return true; }
-		
+		//Handle nulls before attempting to do anything else...
+		if (ReferenceEquals(a, null) || ReferenceEquals(a, JsonNull.instance)) {
+			//if a is null, they can only be equal if both are null...
+			return ReferenceEquals(b, null) || ReferenceEquals(b, JsonNull.instance);
+		} else if (ReferenceEquals(b, null) || ReferenceEquals(b, JsonNull.instance)) {
+			//if a is not null, and b is null, then they cannot be equal...
+			return false;
+		}
+
+		//Both things are not null at this point...
 		switch (a.JsonType) {
 			case JsonType.Number:
-				if (b == null) { return false; }
 				//Numbers compared within tolerance
 				//Default compared to double.NaN
 				double val = double.NaN;
@@ -281,35 +290,34 @@ public abstract class JsonValue {
 
 				return d < NUMBER_TOLERANCE;
 			case JsonType.Boolean: // bools compared by true/false equivelence
-				if (b == null) { return false; }
 				if (b is bool) { return a.boolVal == ((bool)b); }
 				if (b is JsonBool) { return a.boolVal == ((JsonBool)b).boolVal; }
-				
+
 				return false;
 			case JsonType.String: // strings compared by internal representations via 'string == string'
-				if (b == null) { return false; }
 				if (b is string) { return a.stringVal == ((string)b); }
 				if (b is JsonString) { return a.stringVal == ((JsonString)b).stringVal; }
-				
+
 				return false;
-			case JsonType.Array:
+
 			case JsonType.Object:
+			case JsonType.Array:
+			default:
 				// Objects and Arrays with different addresses are not considered equal by '=='
-				
 				return false;
-			default: 
-				// Default - a is JsonNull.instance
-				
-				return (b == null || b == JsonNull.instance);
 		}
 
 	}
 
 	/// <summary>
 	/// Equality Comparison from any JsonValue type to any object
+	/// This is more in depth than a plain '==' comparison, which defaults to references
+	/// This checks all keys within the method
 	/// </summary>
 	public override bool Equals(object b) {
 		if (ReferenceEquals(this, b)) { return true; }
+		if (b == null) { return false; }
+
 		switch (JsonType) {
 			case JsonType.Number:
 			case JsonType.Boolean:
@@ -317,7 +325,6 @@ public abstract class JsonValue {
 				//Re-use code for '==' for 'primitive' types.
 				return (this == b);
 			case JsonType.Array:
-				if (b == null) { return false; }
 				if (b is JsonArray) {
 					JsonArray arr = b as JsonArray;
 					if (Count != arr.Count) { return false; }
@@ -328,7 +335,6 @@ public abstract class JsonValue {
 				}
 				return false;
 			case JsonType.Object:
-				if (b == null) { return false; }
 				if (b is JsonObject) {
 					JsonObject obj = b as JsonObject;
 					if (Count != obj.Count) { return false; }
@@ -340,7 +346,7 @@ public abstract class JsonValue {
 						if (val != this[key]) { return false; }
 						i++;
 					}
-					return i == Count;
+					return true;
 				}
 				return false;
 			default: // Default - a is JsonNull.instance
@@ -351,7 +357,7 @@ public abstract class JsonValue {
 	public override int GetHashCode() {
 		return base.GetHashCode();
 	}
-	
+
 }
 
 /// <summary> Base class for JsonValues that hold a group of objects </summary>
@@ -458,7 +464,7 @@ public class JsonNumber : JsonValue {
 	public override float floatVal { get { return Single.Parse(_value); } }
 	public override int intVal	{ get { return Int32.Parse(_value); } }
 
-	
+
 	/// <summary> Internal hidden constructor </summary>
 	internal JsonNumber(string value) : base() { _value = value; }
 
@@ -475,7 +481,7 @@ public class JsonNumber : JsonValue {
 
 	public override string ToString() { return ""+_value; }
 	public override string PrettyPrint() { return ""+_value; }
-	
+
 #else
 	/// <summary> Internal representation </summary>
 	private double _value;
@@ -551,7 +557,8 @@ public class JsonString : JsonValue {
 #region Composites
 /// <summary> Representation of arbitrary object types as JsonObjects </summary>
 public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonString, JsonValue>> {
-	
+
+
 	protected override string BeginMarker { get { return "{"; } }
 	protected override string EndMarker { get { return "}"; } }
 
@@ -645,11 +652,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 			double.TryParse(val.stringVal, out numVal);
 			return Convert.ChangeType(numVal, type);
 		}
-		
+
 		if (type.IsValueType && val.isObject) {
 			return Json.GetValue(val, type);
 		}
-		
+
 		return null;
 	}
 
@@ -676,7 +683,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public T Extract<T>( string key, T defaultValue = default(T) ) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
-			
+
 			if (val.JsonType == Json.ReflectedType(defaultValue) ) { return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
@@ -763,7 +770,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Removes all KeyValue pairs from the JsonObject. </summary>
 	public JsonObject Clear() { data.Clear(); return this; }
 
-	
+
 
 	/// <summary> Takes all of the KeyValue pairs from the other object, 
 	/// and sets this object to have the same values for those keys. </summary>
@@ -783,7 +790,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
-	
+
 	/// <summary>
 	/// Compares keys between two JsonObjects
 	/// If the values of the keys are the same (including 'not being there'), returns true.
@@ -850,7 +857,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	protected List<JsonValue> list;
 	/// <summary> Get the internal representation of data </summary>
 	public List<JsonValue> GetList() { return list; }
-	
+
 	public override JsonType JsonType { get { return JsonType.Array; } }
 	public override int Count { get { return list.Count; } }
 	public override JsonValue this[int index] { 
@@ -923,7 +930,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
 	/// <summary> Get an array of all JsonNumbers as int values  </summary>
 	public int[] ToIntArray() { return ToIntList().ToArray(); }
 	/// <summary> Get a list of all JsonNumbers as int values  </summary>
@@ -935,7 +942,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
 	/// <summary> Get an array of all JsonNumbers as float values  </summary>
 	public float[] ToFloatArray() { return ToFloatList().ToArray(); }
 	/// <summary> Get an list of all JsonNumbers as float values  </summary>
@@ -990,7 +997,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
 		ConstructorInfo constructor = type.GetConstructor(new Type[]{}); 
-		
+
 		List<T> arr = new List<T>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1011,7 +1018,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 				sval = (T)obj;
 				setVal = true;
 			}
-			
+
 			if (setVal) { arr.Add(sval); }
 		}
 		return arr;
@@ -1022,7 +1029,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	/// <summary> Get a list of all JsonObjects as object values  </summary>
 	public List<object> ToObjectList(Type type) {
 		ConstructorInfo constructor = type.GetConstructor(new Type[]{});
-		
+
 		List<object> arr = new List<object>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1041,11 +1048,11 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 				arr.Add(obj);
 			}
 		}
-			
+
 
 		return arr;
 	}
-	
+
 	protected override string CollectionToPrettyPrint() {
 		JsonValue.CURRENT_INDENT++;
 		List<string> output = new List<string>();
@@ -1116,11 +1123,11 @@ public class JsonReflector {
 			Type eleType = destType.GetElementType();
 			MethodInfo genericGrabber = toArrayOf.MakeGenericMethod(eleType);
 			sval = genericGrabber.Invoke(arr, new object[]{});
-			
+
 		} else if (val.isObject) {
 			//TBD: Reflect the JsonObject into a new object of that type
 			JsonObject jobj = val as JsonObject;
-			
+
 			if (destType.IsValueType) {
 				object boxedValue = Activator.CreateInstance(destType);
 				FieldInfo[] fields = destType.GetFields();
@@ -1134,10 +1141,10 @@ public class JsonReflector {
 			}
 			sval = destType.GetNewInstance();
 			if (sval != null) { ReflectInto(jobj, sval); }
-			
-			
+
+
 		}
-		
+
 		return sval;
 	}
 	/// <summary> Reflect value stored in source JsonObject into a destination object. 
@@ -1145,84 +1152,84 @@ public class JsonReflector {
 	public static void ReflectInto(JsonObject source, object destination) {
 		Type type = destination.GetType();
 		if (type.IsValueType) { throw new Exception("Can't reflect Json into a value type. Use Json.GetValue(JsonValue, Type) instead."); }
-		
+
 		var data = source.GetData();
-		
+
 		PropertyInfo mapper = type.GetProperty("Item", new Type[]{typeof(string)});
 		Type mapperValueType = null;
 		MethodInfo mapperSetMethod = null;
-		
+
 		if (mapper != null) {
 			mapperValueType = mapper.PropertyType;
 			mapperSetMethod = mapper.GetSetMethod();
 		}
-		
+
 		PropertyInfo indexer = type.GetProperty("Item", new Type[]{typeof(int)});
 		Type indexerValueType = null;
 		MethodInfo adder = null;
-		
+
 		if (indexer != null) {
 			indexerValueType = indexer.PropertyType;
 			adder = type.GetMethod("Add", new Type[]{indexerValueType});
 		}
-		
+
 		JsonArray _ITEMS = null;
 		foreach (var pair in data) {
 			string key = pair.Key;
 			JsonValue val = pair.Value;
-			
+
 			if (key == "_ITEMS") {
 				_ITEMS = val as JsonArray;
 				continue;
 			}
-			
+
 			PropertyInfo property = type.GetProperty(key, publicMember);
 			if (property != null && property.IsWritable() && property.IsReadable()) {
-				
+
 				Type destType = property.PropertyType;
 				MethodInfo setMethod = property.GetSetMethod();
-				
+
 				object sval = GetReflectedValue(val, destType);
-				
+
 				if (sval != null) {
 					setMethod.Invoke(destination, new object[]{sval});
 				}
-				
+
 				//If there exists a property by a name, there is likely no field by the same name
 				//unless you're a hacker.
 				continue;
 			}
-			
+
 			FieldInfo field = type.GetField(key, publicMember);
 			if (field != null) {
-				
+
 				Type destType = field.FieldType;
-				
+
 				object sval = GetReflectedValue(val, destType);
-				
+
 				if (sval != null) {
 					field.SetValue(destination, sval);
 				}
 				//If we found a field at all, we don't need to try the indexer.
 				continue;
 			}
-			
+
 			//Don't bother with indexer if the set method wasn't extracted.
 			//It will only be set if the index type is string
 			//and the result type is assignable from a json primitive.
 			if (mapperSetMethod != null) {
 				object sval = GetReflectedValue(val, mapperValueType);
-				
+
 				if (sval != null) {
 					mapperSetMethod.Invoke(destination, new object[] {key, sval});
 				}
-				
+
 				continue;
 			}
-			
-			
+
+
 		}
-		
+
 		if (_ITEMS != null && indexer != null && adder != null) {
 			List<JsonValue> list = _ITEMS.GetList();
 			for (int i = 0; i < list.Count; i++) {
@@ -1231,10 +1238,10 @@ public class JsonReflector {
 				adder.Invoke(destination, new object[]{sval} );
 				//indexerSetMethod.Invoke(destination, new object[] {i,sval}); 
 			}
-			
+
 		}
-		
-		
+
+
 	}
 
 	/// <summary> Get a JsonRepresentation of a given code object. 
@@ -1242,12 +1249,12 @@ public class JsonReflector {
 	public static JsonValue Reflect(object source) {
 		if (source == null) { return null; }
 		Type type = source.GetType();
-		
+
 		//Return object directly if it is already a JsonValue in some way.
 		if (typeof(JsonValue).IsAssignableFrom(type)) { return ((JsonValue)source); }
-		
+
 		JsonValue jval = null;
-		
+
 		//Handle primitive types
 		if (type == typeof(string)) { return ((string)source); }
 		else if (type == typeof(double)) { return ((double)source); }
@@ -1267,15 +1274,15 @@ public class JsonReflector {
 			}
 		} else {
 			PropertyInfo keys = type.GetProperty("Keys");
-				
+
 			PropertyInfo mapper = type.GetProperty("Item", new Type[]{typeof(string)});
-			
+
 			PropertyInfo count = type.GetProperty("Count", typeof(int));
 			PropertyInfo indexer = type.GetProperty("Item", new Type[]{typeof(int)});
-			
+
 			PropertyInfo[] properties = type.GetProperties(publicMembers);
 			FieldInfo[] fields = type.GetFields(publicMembers);
-			
+
 			JsonObject obj = new JsonObject();
 			jval = obj;
 
@@ -1288,23 +1295,23 @@ public class JsonReflector {
 
 
 			if (keys != null 
-					&& mapper != null
-					&& !mapper.IsObsolete()
-					&& typeof(IEnumerable<string>).IsAssignableFrom(keys.PropertyType)) {
-				
+				&& mapper != null
+				&& !mapper.IsObsolete()
+				&& typeof(IEnumerable<string>).IsAssignableFrom(keys.PropertyType)) {
+
 				MethodInfo keysGet = keys.GetGetMethod();
 				MethodInfo mapperGet = mapper.GetGetMethod();
 				IEnumerable<string> sKeys = (IEnumerable<string>)keysGet.Invoke(source, null);
-				
+
 				foreach (string key in sKeys) {
 					if (blacklist.Contains<string>(key)) { continue; }
 
 					object mappedObj = mapperGet.Invoke(source, new object[]{key});
 					obj.Add(key, Reflect(mappedObj));
 				}
-				
+
 			}
-			
+
 			if (count != null && indexer != null) {
 				JsonArray arr = new JsonArray();
 				MethodInfo countGet = count.GetGetMethod();
@@ -1316,14 +1323,14 @@ public class JsonReflector {
 				}
 				obj.Add("_ITEMS", arr);
 			}
-			
+
 			foreach (PropertyInfo property in properties) {
 
 				if (property.Name == "Item"
-						|| blacklist.Contains<string>(property.Name) 
-						|| !property.IsWritable() 
-						|| !property.IsReadable()
-						|| property.IsObsolete()) { continue; }
+					|| blacklist.Contains<string>(property.Name) 
+					|| !property.IsWritable() 
+					|| !property.IsReadable()
+					|| property.IsObsolete()) { continue; }
 
 #if UNITY_5
 				//Why did they not mark this obsolete? Can't automatically detect it...
@@ -1331,21 +1338,21 @@ public class JsonReflector {
 #endif
 
 				MethodInfo propGet = property.GetGetMethod();
-				
+
 				object grabbed = propGet.Invoke(source, null);
 				obj.Add(property.Name, Reflect(grabbed));
 			}
-			
+
 			foreach (FieldInfo field in fields) {
 				if (blacklist.Contains<string>(field.Name)
 					|| field.IsObsolete()) { continue; }
-				
+
 				object grabbed = field.GetValue(source);
 				obj.Add(field.Name, Reflect(grabbed));
 			}
-			
+
 		}
-			
+
 		return jval;
 	}
 
@@ -1481,7 +1488,7 @@ public class JsonDeserializer {
 	/// <summary> Logic for moving over characters until the next control character </summary>
 	bool MoveNext() {
 		while (index < json.Length && next != ',' && next != ']' && next != '}') { index++; }
-		
+
 		if (next == ',') {
 			index++;
 			SkipWhitespaceEnd();
@@ -1494,7 +1501,7 @@ public class JsonDeserializer {
 #endif
 			}
 			if (index >= json.Length) { return false; }
-			
+
 		} else {
 			if (json[index] == ']' || json[index] == '}') {
 				index++;
@@ -1597,7 +1604,7 @@ public static class JsonHelpers {
 
 		return 0;
 	}
-	
+
 	public static bool IsObsolete(this MemberInfo info) {
 		return System.Attribute.GetCustomAttribute(info, typeof(System.ObsoleteAttribute)) != null;
 	}
@@ -1622,7 +1629,7 @@ public static class JsonHelpers {
 		MethodInfo getter = p.GetGetMethod();
 		return getter != null;
 	}
-	
+
 }
 #endregion 
 
@@ -1725,7 +1732,7 @@ public static class JsonOperations {
 				if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
 				if (val.isNumber) { result[key] = lhs.GetNumber(key) * val.numVal; }
 			}
-			
+
 		} else {
 			foreach (var val in lim) {
 				if (val.isString) {
@@ -1835,7 +1842,7 @@ public static class JsonOperations {
 
 		foreach (var pair in obj) {
 			string key = pair.Key.stringVal;
-			
+
 			if ( ("" == prefix || key.StartsWith(prefix)) 
 				&& ("" == suffix || key.EndsWith(suffix))
 				&& ("" == contains || key.Contains(contains))) {
@@ -1849,7 +1856,7 @@ public static class JsonOperations {
 		return result;
 	}
 
-	
+
 
 }
 
