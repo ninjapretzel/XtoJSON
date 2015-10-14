@@ -56,8 +56,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.5.2";
-
+	public const string VERSION = "0.6.0";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -74,7 +73,6 @@ public static class Json {
 			return null;
 		}
 	}
-
 
 	/// <summary> Reflect a code object into a JsonValue representation. </summary>
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
@@ -580,7 +578,61 @@ public class JsonString : JsonValue {
 /// <summary> Representation of arbitrary object types as JsonObjects </summary>
 public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonString, JsonValue>> {
 
+	/// <summary>
+	/// Parses a standard CSV-format spreadsheet into a JsonObject.
+	/// Requires that the top row is a header row with names for the columns.
+	/// Each row in the CSV becomes another JsonObject, inserted into the first object
+	/// based on the value in a specified column.
+	/// For any row, if a column is not present, it does not add a key/value pair for that column.
+	/// The separator can also be specified.
+	/// Defaults to using the left-most column as the index, and a comma (',') as the separator.
+	/// </summary>
+	/// <param name="csv">string containing CSV formatted spreadsheet to parse</param>
+	/// <param name="sep">separator character. defaults to ','</param>
+	/// <param name="keyIndex">index of column to use as a 'key'</param>
+	/// <returns>CSV formatted spreadsheet converted into a JsonObject</returns>
+	public static JsonObject ParseCSV(string csv, char sep = ',', int keyIndex = 0) {
+		csv = csv.Replace("\\", "");
+		JsonObject ret = new JsonObject();
 
+		string[] lines = csv.Split('\n');
+		string[] keys = lines[0].Split(sep);
+		for (int i = 0; i < keys.Length; i++) { keys[i] = keys[i].Trim(); }
+
+		for (int i = 1; i < lines.Length; i++) {
+			JsonObject obj = new JsonObject();
+			string[] content = lines[i].Split(sep);
+			string objkey = content[keyIndex];
+
+			for (int k = 0; k < keys.Length && k < content.Length; k++) {
+				string str = content[k];
+
+				if (str != null && str != "") {
+					string key = keys[k];
+					double val = 0;
+					if (double.TryParse(str, out val)) {
+						obj[key] = val;
+					} else if (str == "true") {
+						obj[key] = true;
+					} else if (str == "false") {
+						obj[key] = false;
+					} else {
+						obj[key] = str;
+					}
+
+
+				}
+
+			}
+
+			ret.Add(objkey, obj);
+
+		}
+
+		return ret;
+	}
+	
+	
 	protected override string BeginMarker { get { return "{"; } }
 	protected override string EndMarker { get { return "}"; } }
 
@@ -872,6 +924,52 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 }
 /// <summary> Representation of an array of objects </summary>
 public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
+
+	/// <summary>
+	/// Parses a standard CSV-format spreadsheet into a JsonArray.
+	/// Requires that the top row is a header row with names for the columns.
+	/// Each row in the CSV becomes another JsonObject, inserted into the array.
+	/// For any row, if a column is not present, it does not add a key/value pair for that column.
+	/// The separator can also be specified.
+	/// Defaults to using a comma (',') as the separator.
+	/// </summary>
+	/// <param name="csv">string containing CSV formatted spreadsheet to parse</param>
+	/// <param name="sep">separator character. defaults to ','</param>
+	/// <returns>CSV formatted spreadsheet converted into a JsonArray</returns>
+	public static JsonArray ParseCSV(string csv, char sep = ',') {
+		JsonArray arr = new JsonArray();
+
+		string[] lines = csv.Split('\n');
+		string[] keys = lines[0].Split(sep);
+		for (int i = 0; i < keys.Length; i++) { keys[i] = keys[i].Trim(); }
+
+		for (int i = 1; i < lines.Length; i++) {
+			JsonObject obj = new JsonObject();
+			string[] content = lines[i].Split(sep);
+			for (int k = 0; k < keys.Length && k < content.Length; k++) {
+				string str = content[k];
+				if (str != null && str != "") {
+					string key = keys[k];
+					double val = 0;
+					if (double.TryParse(str, out val)) {
+						obj[key] = val;
+					} else if (str.ToLower() == "true") {
+						obj[key] = true;
+					} else if (str.ToLower() == "false") {
+						obj[key] = false;
+					} else {
+						obj[key] = str;
+					}
+
+				}
+
+			}
+			arr.Add(obj);
+
+		}
+
+		return arr;
+	}
 
 	protected override string BeginMarker { get { return "["; } }
 	protected override string EndMarker { get { return "]"; } }
