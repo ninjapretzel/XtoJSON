@@ -19,14 +19,14 @@
 
 //Definition Flags:
 
-//XtoJSON_StrictCommaRules 
+//#define XtoJSON_StrictCommaRules 
 //	Enabled - When parsing JSON, makes commas before end-group characters cause an exception.
 //	Disabled - Commas before end-group characters are allowed
 //Example: { "blah":"bluh", } 
 //	the above JSON will cause an exception to be thrown with the flag enabled, 
 //	and will parse successfully with the flag disabled.
 
-//XtoJSON_StringNumbers
+//#define XtoJSON_StringNumbers
 //	Enabled - numbers are stored internally as a string value, and are converted to and from number types
 //	Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 //May have minor performance implications when enabled.
@@ -919,9 +919,9 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return string.Join("", output.ToArray());
 	}
 
-
-
 }
+
+
 /// <summary> Representation of an array of objects </summary>
 public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
@@ -1642,7 +1642,6 @@ public class JsonDeserializer {
 				matchQuote = index;
 			}
 		}
-
 
 		string result = json.Substring(startIndex, matchQuote - startIndex).TrimEnd();
 		//Debug.Log("ProcessKey: " + startIndex + "-" + index + " [" + result + "]");
