@@ -31,6 +31,12 @@
 //	Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 //May have minor performance implications when enabled.
 
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5
+#define UNITY
+using UnityEngine;
+
+
+#endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -40,11 +46,6 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5
-using UnityEngine;
-
-
-#endif
 
 
 
@@ -1220,10 +1221,34 @@ public class JsonReflector {
 	/// <summary> Binding flags for easy usage </summary>
 	static BindingFlags publicMember = BindingFlags.Instance | BindingFlags.Public;
 
+	/// <summary> Contains all blacklisted types (reflect to null by default) </summary>
+	static HashSet<Type> blacklist = new HashSet<Type>();
+	/// <summary> Blacklist a given type from being reflected </summary>
+	/// <param name="t">Type to blacklist</param>
+	public static void Blacklist(Type t) {
+		if (!blacklist.Contains(t)) { blacklist.Add(t); }
+	}
+
+	/// <summary> Remove a given type from being blacklisted</summary>
+	/// <param name="t">Type to unblacklist</param>
+	public static void UnBlacklist(Type t) {
+		if (blacklist.Contains(t)) { blacklist.Remove(t); }
+	}
+
+#if UNITY
+	public static bool loaded = Load();
+	static bool Load() {
+		Blacklist(typeof(PhysicMaterial));
+		Blacklist(typeof(Material));
+		return true;
+	}
+#endif
+
 	/// <summary> Reflect a JsonValue based on a given type. Attempts to return an object, 
 	/// so return value may be null even if a value type is requested. </summary>
 	public static object GetReflectedValue(JsonValue val, Type destType) {
-		if (val == null) { return null; }
+		if (val == null || blacklist.Contains(destType)) { return null; }
+
 		object sval = null;
 		if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
 		else if (val.isString && destType.IsNumeric()) { 
@@ -1504,6 +1529,7 @@ public class JsonDeserializer {
 	/// <summary> Deserialize the Json text, and get back the resulting JsonValue </summary>
 	public JsonValue Deserialize() {
 		index = 0;
+		if (json.Length == 0) { return null; }
 		SkipWhitespace();
 		return ProcessValue();
 	}
