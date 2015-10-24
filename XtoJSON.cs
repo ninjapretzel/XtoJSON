@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.0";
+	public const string VERSION = "0.6.1";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -96,6 +96,24 @@ public static class Json {
 			JsonReflector.ReflectInto(source, destination);
 		}
 	}
+
+	/// <summary> Convert some object to a JSON string </summary>
+	/// <param name="o">object to convert</param>
+	/// <returns>Json-formed string or element representing the object parameter</returns>
+	public static string Serialize(object o) {
+		JsonValue val = Reflect(o);
+		return val.PrettyPrint();
+	}
+
+	/// <summary> Deserializes a JSON string into an object of a given type. </summary>
+	/// <typeparam name="T">Generic type to deserialize as</typeparam>
+	/// <param name="json">Json-Format data string</param>
+	/// <returns>A 'T' object deserialized from the given string.</returns>
+	public static T Deserialize<T>(string json) {
+		JsonValue val = Parse(json);
+		return GetValue<T>(val);
+	}
+
 
 	/// <summary> Get the expected type of the reflection of a code object. </summary>
 	public static JsonType ReflectedType(object o) {
