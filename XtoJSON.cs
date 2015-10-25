@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.1";
+	public const string VERSION = "0.6.2";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -114,6 +114,17 @@ public static class Json {
 		return GetValue<T>(val);
 	}
 
+	/// <summary>
+	/// Creates a clone of the object by reflecting its internal values, and constructing a new object
+	/// using the same values.
+	/// </summary>
+	/// <typeparam name="T">Type of object to get back</typeparam>
+	/// <param name="o">Source data to use</param>
+	/// <returns>A T object with the data provided by o</returns>
+	public static T Clone<T>(object o) {
+		JsonValue val = Reflect(o);
+		return GetValue<T>(val);
+	}
 
 	/// <summary> Get the expected type of the reflection of a code object. </summary>
 	public static JsonType ReflectedType(object o) {
