@@ -1,44 +1,49 @@
 # XtoJSON
-###Press X to Jason. Oh wait, that's something else. This is a lightweight C# Json library.
+### Press X to Jason. Oh wait, that's Heavy Rain. Oops. This is a lightweight C# Json library.
 
 Anyway, XtoJSON is, as it says, a lightweight JSON parser written in C#.  
-I wrote it after being dissapointed that System.Json isn't easily available outside of silverlight.  
-It's not perfect- I know that there are still some problems with it.  
-It is loosely based on the System.Json classes, with some tweaks and changes thrown in.  
+I wrote it after being dissapointed that System.Json isn't easily available outside of silverlight, and not liking specific things about existing JSON libraries like JSONSharp and Json.Net.
 
-It's also all in one file- This is because I wanted to be able to easily drop it into a project I am working on.
-I decided to do it this way because many other JSON libraries for C# are made of many many classes, 
-when JSON is a pretty easy thing to handle in a small amount of code.
+It is loosely based on the System.Json classes, as well as the JSONSharp and Json.Net libraries. Consider XtoJSON the bastard child of these three libraries.
 
-Other things were based on JSONSharp and Json.Net consider XtoJSON the bastard child of these three libraries.
-
-Here is a quick example. (inside of some function in C#)
+#### One-Line Serialize and Deserialize
 ```
-JsonObject obj = new JsonObject();
-obj["name"] = "Bobby";
-obj["class"] = "warrior";
-obj["hp"] = 50;
-obj["dead"] = false;
+//Unity Vector3
+Vector3 pos = new Vector3(1, 2, 3);
+string posJson = Json.Serialize(pos);
+//Gives us: {
+//	"x":1,
+//	"y":2,
+//	"z":3
+//}
+Vector3 dePos = Json.Deserialize<Vector3>(posJson);
+//gives us: (1.0, 2.0, 3.0)
+```
 
+
+#### Sample Code: 
+```
+JsonObject obj = new JsonObject()
+    .Add("name", "Bobby")
+    .Add("class", "warrior")
+    .Add("hp", 50)
+    .Add("dead", false);
 Console.WriteLine(obj.PrettyPrint());
-//Gives us the json:
-/*
+Gives us the json:
 {
     "name":"Bobby",
 	"class":"warrior",
 	"hp":50,
 	"dead":false
 }
-//*/
 ```
 
-
-###Features :
+### Features :
  * Serialize C# objects to JSON
  * Serializes objects as arrays that provide an indexer with an int index (this[int blah]) and int 'Count' properties
  * Serializes objects that provide an indexer with a string index (this[string blah]) and IEnumerable<string> 'Keys' properties
  * Serializes objects recusively, and as extensively as possible.
- * **BE WARNED: ANY OBJECT WITH LOOPING REFERENCES (CIRCULAR LISTS) WILL NOT TERMINATE SERIALIZATION (INFINITE LOOP)**
+ * **BE WARNED: ANY OBJECT WITH LOOPING REFERENCES (ex CIRCULAR LISTS with last pointint to first ) WILL NOT TERMINATE SERIALIZATION (INFINITE LOOP)**
  * Deserialize JSON into internal JsonValue classes
  * Reflect information stored in a JsonObject into an arbitrary object.
  * Construct JSON objects/arrays from scratch (via code)
@@ -47,7 +52,7 @@ Console.WriteLine(obj.PrettyPrint());
  * Explicit conversions from JsonValue types back to primitives
  * Easy, quick to write syntax
 
-###Classes:
+### Classes:
  * Json - Quick access to JsonReflector and JsonDeserializer.
  * JsonValue - Base class for everything
  * JsonValueCollection - Base class for objects/arrays
