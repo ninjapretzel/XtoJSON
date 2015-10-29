@@ -1908,11 +1908,13 @@ public static class JsonOperations {
 			}
 
 		} else {
-			foreach (var val in lim) {
-				if (val.isString) {
-					string key = val.stringVal;
+			foreach (var field in lim) {
+				if (field.isString) {
+					JsonValue val = rhs[field.stringVal];
+					string key = field.stringVal;
+
 					if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
-					if (val.isNumber) { result[key] = lhs.GetNumber(key) * rhs.GetNumber(key); }
+					if (val.isNumber) { result[key] = lhs.GetNumber(key) * val.numVal; }
 				}
 			}
 
