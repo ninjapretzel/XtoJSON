@@ -631,7 +631,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 		for (int i = 1; i < lines.Length; i++) {
 			JsonObject obj = new JsonObject();
-			string[] content = lines[i].Split(sep);
+			string line = lines[i];
+			if (line.Length <= 2) { continue; }
+			if (line.StartsWith("#")) { continue; }
+
+			string[] content = line.Split(sep);
 			string objkey = content[keyIndex];
 
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
@@ -642,9 +646,9 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 					double val = 0;
 					if (double.TryParse(str, out val)) {
 						obj[key] = val;
-					} else if (str == "true") {
+					} else if (str.ToLower() == "true") {
 						obj[key] = true;
-					} else if (str == "false") {
+					} else if (str.ToLower() == "false") {
 						obj[key] = false;
 					} else {
 						obj[key] = str;
@@ -975,7 +979,11 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 		for (int i = 1; i < lines.Length; i++) {
 			JsonObject obj = new JsonObject();
-			string[] content = lines[i].Split(sep);
+			string line = lines[i];
+			if (line.Length <= 2) { continue; }
+			if (line.StartsWith("#")) { continue; }
+
+			string[] content = line.Split(sep);
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
 				string str = content[k];
 				if (str != null && str != "") {
