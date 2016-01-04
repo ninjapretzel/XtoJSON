@@ -445,6 +445,14 @@ public class JsonNull : JsonValue {
 	/// <summary> private constructor </summary>
 	private JsonNull() : base() { }
 
+	public override double numVal { get { return 0; } }
+	public override double doubleVal { get { return 0; } }
+	public override float floatVal { get { return 0; } }
+	public override int intVal { get { return 0; } }
+
+	public override bool boolVal { get { return false; } }
+	public override string stringVal { get { return "null"; } }
+
 	public override JsonType JsonType { get { return JsonType.Null; } }
 	public override string ToString() { return _value; }
 	public override string PrettyPrint() { return _value; }
@@ -461,6 +469,11 @@ public class JsonBool : JsonValue {
 	/// <summary> 'false' instance </summary>
 	public static JsonBool FALSE = new JsonBool(false);
 
+	public override string stringVal { get { return _value; } }
+	public override int intVal { get { return _value == "true" ? 1 : 0; } }
+	public override double numVal { get { return _value == "true" ? 1 : 0; } }
+	public override float floatVal { get { return _value == "true" ? 1 : 0; } }
+	public override double doubleVal { get { return _value == "true" ? 1 : 0; } }
 	public override bool boolVal { get { return _value == "true"; } }
 	public override JsonType JsonType { get { return JsonType.Boolean; } }
 
@@ -470,7 +483,7 @@ public class JsonBool : JsonValue {
 	public static JsonBool Get(bool val) { return val ? TRUE : FALSE; }
 
 	/// <summary> Private constructor </summary>
-	private JsonBool(bool value) : base() { _value = (""+value).ToLower(); }
+	private JsonBool(bool value) : base() { _value = value ? "true" : "false"; }
 
 	public override string ToString() { return _value; }
 	public override string PrettyPrint() { return ToString(); }
@@ -522,6 +535,8 @@ public class JsonNumber : JsonValue {
 	/// <summary> Internal representation </summary>
 	private double _value;
 
+	public override bool boolVal { get { return _value != 0D && !double.IsNaN(_value); } }
+	public override string stringVal { get { return _value.ToString("###0.#"); } }
 	public override double numVal { get { return _value; } }
 	public override double doubleVal { get { return _value; } }
 	public override float floatVal { get { return (float)_value; } }
@@ -570,6 +585,7 @@ public class JsonString : JsonValue {
 		}
 	}
 
+	public override bool boolVal { get { return _value.ToLower().Trim().Equals("true"); } }
 	public override double doubleVal { get { return numVal; } }
 	public override int intVal { get { return (int) numVal; } }
 	public override float floatVal { get { return (float) numVal; } }
