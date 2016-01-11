@@ -914,6 +914,12 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
+	/// <summary> Sets a key to a value. Supports assignment when indexers are not available. </summary>
+	/// <returns> The same object that it was called on.</returns>
+	public JsonObject Set(string key, JsonValue value) {
+		this[key] = value;
+		return this;
+	}
 
 	/// <summary>
 	/// Compares keys between two JsonObjects
