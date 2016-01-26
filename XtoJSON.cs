@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.2";
+	public const string VERSION = "0.6.3";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -884,11 +884,29 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		foreach (JsonString str in mask) { result.Add(str, this[str]); }
 		return result;
 	}
-	/// <summary> Creates a new JsonObject that has a subset of the original's KeyValue pairs </summary>
+
+	/// <summary> Creates a new JsonObject that has a subset of the original's KeyValue pairs,
+	/// using a list of strings as the mask. </summary>
+	/// <param name="mask">collection of strings to use as the mask</param>
+	/// <returns>A copy of the original JsonObject, only containing keys that are in the mask. </returns>
 	public JsonObject Mask(IEnumerable<string> mask) {
 		JsonObject result = new JsonObject();
 		foreach (string str in mask) { result.Add(str, this[str]); }
 		return result;
+	}
+
+	/// <summary> Creates a new JsonObject that has a subset of the original's Key value pairs,
+	/// using the boolean value of pairs within another JsonObject </summary>
+	/// <param name="mask">JsonObject containing mask pairs. Only considers pairs of (string, bool) </param>
+	/// <returns>A copy of the original JsonObject with the mask applied to it. </returns>
+	public JsonObject Mask(JsonObject mask) {
+		List<string> msk = new List<string>();
+		foreach (var pair in mask) {
+			if (pair.Value.isBool && pair.Value.boolVal) {
+				msk.Add(pair.Key.stringVal);
+			}
+		}
+		return Mask(msk);
 	}
 
 	/// <summary> Removes all KeyValue pairs from the JsonObject. </summary>
@@ -1314,6 +1332,13 @@ public class JsonReflector {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
 			sval = Convert.ChangeType(numVal, destType);
+		}
+		else if (val.isString && destType.IsEnum) { 
+			try {
+				sval = Enum.Parse(destType, val.stringVal);
+			} catch {
+				sval = Enum.ToObject(destType, 0);
+			}
 		}
 		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; }
 		else if (val.isNumber && destType == typeof(float)) { sval = (float) val.numVal; }
