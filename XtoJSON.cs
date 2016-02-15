@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.3";
+	public const string VERSION = "0.6.4";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -352,7 +352,7 @@ public abstract class JsonValue {
 	/// </summary>
 	public override bool Equals(object b) {
 		if (ReferenceEquals(this, b)) { return true; }
-		if (b == null) { return false; }
+		if (b == null && !ReferenceEquals(this, JsonNull.instance)) { return false; }
 
 		switch (JsonType) {
 			case JsonType.Number:
@@ -365,7 +365,7 @@ public abstract class JsonValue {
 					JsonArray arr = b as JsonArray;
 					if (Count != arr.Count) { return false; }
 					for (int i = 0; i < Count; i++) {
-						if (this[i] != arr[i]) { return false; }
+						if (!this[i].Equals(arr[i])) { return false; }
 					}
 					return true;
 				}
@@ -379,7 +379,7 @@ public abstract class JsonValue {
 						string key = pair.Key.stringVal;
 						JsonValue val = pair.Value;
 						if (!this.ContainsKey(key)) { return false; }
-						if (val != this[key]) { return false; }
+						if (!val.Equals(this[key])) { return false; }
 						i++;
 					}
 					return true;
@@ -1112,15 +1112,98 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	/// <summary> Returns the internal list's Enumerator </summary>
 	public IEnumerator<JsonValue> GetEnumerator() { return list.GetEnumerator(); }
 
-	public static implicit operator string[](JsonArray a) { return a.ToStringArray(); }
-	public static implicit operator double[](JsonArray a) { return a.ToDoubleArray(); }
-	public static implicit operator float[](JsonArray a) { return a.ToFloatArray(); }
-	public static implicit operator int[](JsonArray a) { return a.ToIntArray(); }
+	public static implicit operator string[](JsonArray a) { return a.OnlyStringsToArray(); }
+	public static implicit operator double[](JsonArray a) { return a.OnlyNumbersToArray(); }
+	public static implicit operator float[](JsonArray a) { return a.OnlyFloatsToArray(); }
+	public static implicit operator int[](JsonArray a) { return a.OnlyIntToArray(); }
+	
+	/// <summary>
+	/// Searches through the array for an object with a key matching a string value
+	/// </summary>
+	/// <param name="key">Key to search for </param>
+	/// <param name="value">String to search for </param>
+	/// <returns>first object containing the (key:value) pair</returns>
+	public JsonObject FindObjectBy(string key, string value) {
+		foreach (var val in this) {
+			JsonObject obj = val as JsonObject;
+			if (obj != null) {
+				Debug.Log(obj[key]);
+				if (obj.ContainsKey(key) && obj.Get<string>(key) == value) { return obj; }
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
+	/// Searches through the array for an object with a key matching a string value
+	/// </summary>
+	/// <param name="key">Key to search for </param>
+	/// <param name="value">Value to search for </param>
+	/// <param name="tolerance">tolerance of comparison (default = .001)</param>
+	/// <returns>first object containing the (key:value) pair inside of the tolerance range</returns>
+	public JsonObject FindObjectBy(string key, double value, double tolerance = .001) {
+		foreach (var val in this) {
+			JsonObject obj = val as JsonObject;
+			if (obj != null) {
+				Debug.Log(obj[key]);
+				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key)-value) < tolerance) {
+					return obj;
+				}
+			}
+		}
+		return null;
+	}
+
+	/// <summary>
+	/// Finds ALL objects that have a pair with (key:value)
+	/// </summary>
+	/// <param name="key">Key to look for </param>
+	/// <param name="value">Value to look for </param>
+	/// <returns>JsonArray of all matching objects, or an empty JsonArray if none match</returns>
+	public JsonArray FindObjectsBy(string key, string value) {
+		JsonArray ray = new JsonArray();
+
+		foreach (var val in this) {
+			JsonObject obj = val as JsonObject;
+			if (obj != null) {
+				Debug.Log(obj[key]);
+				if (obj.ContainsKey(key) && obj.Get<string>(key) == value) {
+					ray.Add(obj);
+				}
+			}
+		}
+
+		return ray;
+	}
+
+	/// <summary>
+	/// Finds ALL objects that have a pair with (key:value)
+	/// </summary>
+	/// <param name="key">Key to look for </param>
+	/// <param name="value">Value to look for </param>
+	/// <param name="tolerance">tolerance of comparison (default = .001)</param>
+	/// <returns>JsonArray of all matching objects, or an empty JsonArray if none match</returns>
+	public JsonArray FindObjectsBy(string key, double value, double tolerance = .001) {
+		JsonArray ray = new JsonArray();
+
+		foreach (var val in this) {
+			JsonObject obj = val as JsonObject;
+			if (obj != null) {
+				Debug.Log(obj[key]);
+				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key) - value) < tolerance) {
+					ray.Add(obj);
+				}
+			}
+		}
+
+		return ray;
+	}
 
 	/// <summary> Get an array of all JsonNumbers as double values  </summary>
-	public double[] ToDoubleArray() { return ToDoubleList().ToArray(); }
+	public double[] OnlyNumbersToArray() { return OnlyNumbersToList().ToArray(); }
 	/// <summary> Get a list of all JsonNumbers as double values </summary>
-	public List<double> ToDoubleList() {
+	public List<double> OnlyNumbersToList() {
 		List<double> arr = new List<double>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1129,10 +1212,12 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 
+	
+
 	/// <summary> Get an array of all JsonNumbers as int values  </summary>
-	public int[] ToIntArray() { return ToIntList().ToArray(); }
+	public int[] OnlyIntToArray() { return OnlyIntToList().ToArray(); }
 	/// <summary> Get a list of all JsonNumbers as int values  </summary>
-	public List<int> ToIntList() {
+	public List<int> OnlyIntToList() {
 		List<int> arr = new List<int>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1142,9 +1227,9 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	}
 
 	/// <summary> Get an array of all JsonNumbers as float values  </summary>
-	public float[] ToFloatArray() { return ToFloatList().ToArray(); }
+	public float[] OnlyFloatsToArray() { return OnlyFloatToList().ToArray(); }
 	/// <summary> Get an list of all JsonNumbers as float values  </summary>
-	public List<float> ToFloatList() {
+	public List<float> OnlyFloatToList() {
 		List<float> arr = new List<float>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1154,9 +1239,9 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	}
 
 	/// <summary> Get an array of all JsonBooleans as bool values  </summary>
-	public bool[] ToBoolArray() { return ToBoolList().ToArray(); }
+	public bool[] OnlyBoolToArray() { return OnlyBoolToList().ToArray(); }
 	/// <summary> Get a list of all JsonBooleans as bool values  </summary>
-	public List<bool> ToBoolList() {
+	public List<bool> OnlyBoolToList() {
 		List<bool> arr = new List<bool>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1166,9 +1251,9 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	}
 
 	/// <summary> Get an array of all JsonStrings as string values  </summary>
-	public string[] ToStringArray() { return ToStringList().ToArray(); }
+	public string[] OnlyStringsToArray() { return OnlyStringToList().ToArray(); }
 	/// <summary> Get a list of all JsonStrings as string values  </summary>
-	public List<string> ToStringList() {
+	public List<string> OnlyStringToList() {
 		List<string> arr = new List<string>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1176,11 +1261,22 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
+	
+	/// <summary> Get an array of all primitive elements in the JsonArray as strings </summary>
+	/// <returns> A string[] of all primitive elements in the JsonArray as strings </returns>
+	public string[] ToStringArray() { return ToStringList().ToArray(); }
+	public List<string> ToStringList() {
+		List<string> arr = new List<string>();
+		foreach (var item in this) {
+			try { arr.Add(item.stringVal); } catch { }
+		}
+		return arr;
+	}
 
 	/// <summary> Get an array of all JsonObjects values  </summary>
-	public JsonObject[] ToJsonObjectArray() { return ToJsonObjectList().ToArray(); }
+	public JsonObject[] OnlyObjectToArray() { return OnlyObjectToList().ToArray(); }
 	/// <summary> Get a list of all JsonObjects values  </summary>
-	public List<JsonObject> ToJsonObjectList() {
+	public List<JsonObject> OnlyObjectToList() {
 		List<JsonObject> arr = new List<JsonObject>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
@@ -1188,6 +1284,8 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
+
+	
 
 	/// <summary> Get an array of all JsonObjects as T values  </summary>
 	public T[] ToArrayOf<T>() { return ToListOf<T>().ToArray(); }
