@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.4";
+	public const string VERSION = "0.6.5";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -726,6 +726,23 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	public JsonObject(JsonObject src) : this() { Add(src); }
 	/// <summary> Create an JsonObject, setting its data to the parameter. </summary>
 	public JsonObject(Dictionary<JsonString, JsonValue> src) : base() { data = src; }
+
+	/// <summary> Initialize with an array of key,value pairs</summary>
+	/// <param name="pairs">Pairs of values to use. Must be even in length, and contain 'JsonString,JsonValue' pairs</param>
+	public JsonObject(params JsonValue[] pairs) : this() {
+		
+		if (pairs.Length % 2 == 0) {
+			for (int i = 0; i < pairs.Length; i+=2) {
+				JsonString key = (JsonString) pairs[i];
+				JsonValue val = pairs[i+1];
+
+				data.Add(key, val);
+			}
+
+		} else {
+			throw new TargetParameterCountException("Parameters into JsonObject(params JsonValue[]) must be even");
+		}
+	}
 
 	/// <summary> Create a duplicate of this object </summary>
 	public JsonObject Clone() { return new JsonObject(this); }
