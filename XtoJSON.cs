@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.5";
+	public const string VERSION = "0.6.6";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -74,7 +74,7 @@ public static class Json {
 			return null;
 		}
 	}
-
+	
 	/// <summary> Reflect a code object into a JsonValue representation. </summary>
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
 
@@ -638,7 +638,6 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <param name="keyIndex">index of column to use as a 'key'</param>
 	/// <returns>CSV formatted spreadsheet converted into a JsonObject</returns>
 	public static JsonObject ParseCSV(string csv, char sep = ',', int keyIndex = 0) {
-		csv = csv.Replace("\\", "");
 		JsonObject ret = new JsonObject();
 
 		string[] lines = csv.Split('\n');
@@ -653,10 +652,10 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 			string[] content = line.Split(sep);
 			string objkey = content[keyIndex];
-
+			
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
 				string str = content[k];
-
+				
 				if (str != null && str != "") {
 					string key = keys[k];
 					double val = 0;
@@ -667,7 +666,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 					} else if (str.ToLower() == "false") {
 						obj[key] = false;
 					} else {
-						obj[key] = str;
+						obj[key] = str.Replace("\\n", "\n").Replace("\\t", "\t");
 					}
 
 
@@ -1043,6 +1042,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 			string[] content = line.Split(sep);
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
 				string str = content[k];
+				
 				if (str != null && str != "") {
 					string key = keys[k];
 					double val = 0;
@@ -1053,7 +1053,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 					} else if (str.ToLower() == "false") {
 						obj[key] = false;
 					} else {
-						obj[key] = str;
+						obj[key] = str.Replace("\\n", "\n").Replace("\\t", "\t");
 					}
 
 				}
@@ -1144,7 +1144,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (var val in this) {
 			JsonObject obj = val as JsonObject;
 			if (obj != null) {
-				Debug.Log(obj[key]);
 				if (obj.ContainsKey(key) && obj.Get<string>(key) == value) { return obj; }
 			}
 		}
@@ -1163,7 +1162,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (var val in this) {
 			JsonObject obj = val as JsonObject;
 			if (obj != null) {
-				Debug.Log(obj[key]);
 				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key)-value) < tolerance) {
 					return obj;
 				}
@@ -1184,7 +1182,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (var val in this) {
 			JsonObject obj = val as JsonObject;
 			if (obj != null) {
-				Debug.Log(obj[key]);
 				if (obj.ContainsKey(key) && obj.Get<string>(key) == value) {
 					ray.Add(obj);
 				}
@@ -1207,7 +1204,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (var val in this) {
 			JsonObject obj = val as JsonObject;
 			if (obj != null) {
-				Debug.Log(obj[key]);
 				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key) - value) < tolerance) {
 					ray.Add(obj);
 				}
@@ -1739,8 +1735,9 @@ public class JsonDeserializer {
 		if (next == '[') { return ProcessArray(); }
 		if (next == '{') { return ProcessObject(); }
 		if (next == '"') { 
-			string val = ProcessString().JsonUnescapeString();
-			//TBD: Additional processing
+			string val = ProcessString();
+			val = val.JsonUnescapeString();
+			//TBD: Additional processing if needed
 
 			return val;
 		}
@@ -1867,9 +1864,7 @@ public class JsonDeserializer {
 				matchQuote = index;
 			}
 		}
-
 		string result = json.Substring(startIndex, matchQuote - startIndex).TrimEnd();
-		//Debug.Log("ProcessKey: " + startIndex + "-" + index + " [" + result + "]");
 		return result;
 	}
 
@@ -1893,6 +1888,9 @@ public static class JsonHelpers {
 
 	/// <summary> Escape characters to escape inside of Json text </summary>
 	static string[] TOESCAPE = new string[] { "\\", "\"", "\b", "\f", "\n", "\r", "\t" };
+	
+	/// <summary> Escape character codes to use for escapes</summary>
+	static string[] ESCAPE_CODES = new string[] { "\\\\", "\\\"", "\\b", "\\f", "\\n", "\\r", "\\t" };
 
 	/// <summary> Is the type of an object is a given type? </summary>
 	public static bool IsOf(this object o, Type t) { return o.GetType() == t; }
@@ -1906,7 +1904,8 @@ public static class JsonHelpers {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
 			string escaped = TOESCAPE[i];
-			s = s.Replace(escaped, "\\" + escaped);
+			string escapeCode = ESCAPE_CODES[i];
+			s = s.Replace(escaped, escapeCode);
 		}
 		return s;
 	}
@@ -1916,7 +1915,9 @@ public static class JsonHelpers {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
 			string escaped = TOESCAPE[TOESCAPE.Length - i - 1];
-			s = s.Replace("\\" + escaped, escaped);
+			string escapeCode = ESCAPE_CODES[ESCAPE_CODES.Length - i - 1];
+
+			s = s.Replace(escapeCode, escaped);
 		}
 		return s;
 	}
