@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.6";
+	public const string VERSION = "0.6.7";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -928,6 +928,20 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Removes all KeyValue pairs from the JsonObject. </summary>
 	public JsonObject Clear() { data.Clear(); return this; }
 
+	/// <summary> Sets keys of this JsonObject, and any children in both it and other </summary>
+	/// <param name="other">Other data to override this object's data with</param>
+	/// <returns>A reference to the original JsonObject, after it has been modified with the values from 'other'</returns>
+	public JsonObject SetRecursively(JsonObject other) {
+		foreach (var pair in other) {
+			var thisOfKey = this[pair.Key];
+			if (pair.Value.isObject && thisOfKey.isObject) {
+				(thisOfKey as JsonObject).SetRecursively(pair.Value as JsonObject);
+			} else {
+				this[pair.Key] = pair.Value;
+			}
+		}
+		return this;
+	}
 
 
 	/// <summary> Takes all of the KeyValue pairs from the other object, 
