@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.7";
+	public const string VERSION = "0.6.8";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -758,6 +758,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
+	
 	/// <summary> Adds all of the entries in a Dictionary<string, JsonValue> 
 	/// or other type of Enumerable group of pairs of <string, JsonValue> </summary>
 	public JsonObject AddAll<T>(IEnumerable<KeyValuePair<string, T>> info) where T : JsonValue {
@@ -943,15 +944,49 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
-
-	/// <summary> Takes all of the KeyValue pairs from the other object, 
-	/// and sets this object to have the same values for those keys. </summary>
-	public JsonObject Set(JsonObject other) {
+	/// <summary> Combines this and <paramref name="other"/> into a new JsonObject, recursively </summary>
+	/// <param name="other">other JsonObject to combine with </param>
+	/// <returns>A new JsonObject with the combined values of this and other (in order) </returns>
+	public JsonObject CombineRecursively(JsonObject other) { 
+		JsonObject obj = new JsonObject().Set(this);
 		foreach (var pair in other) {
-			this[pair.Key] = pair.Value;
+			var objOfKey = obj[pair.Key];
+			if (pair.Value.isObject && objOfKey.isObject) {
+				obj[pair.Key] = (objOfKey as JsonObject).Clone().SetRecursively(pair.Value as JsonObject);
+			} else {
+				obj[pair.Key] = pair.Value;
+			}
 		}
+		return obj;
+	}
+
+	/// <summary> Combines <paramref name="first"/> and <paramref name="second"/> into a new JsonObject, recursively </summary>
+	/// <param name="first">First JsonObject</param>
+	/// <param name="second">Second JsonObject</param>
+	/// <returns>A new JsonObject with the combined values of first and second (in order)</returns>
+	public static JsonObject CombineRecursively(JsonObject first, JsonObject second) { 
+		return first.CombineRecursively(second);	
+	}
+
+	/// <summary> Takes all of the KeyValue pairs from the other object, and sets this object to have the same values for those keys. </summary>
+	/// <param name="other">Other object holding values to set</param>
+	/// <returns>The same object that this method was called on, after it has been modified</returns>
+	public JsonObject Set(JsonObject other) {
+		foreach (var pair in other) { this[pair.Key] = pair.Value; }
 		return this;
 	}
+
+	/// <summary> Combines this JsonObject with <paramref name="other"/>, into a new JsonObject. </summary>
+	/// <param name="other">Other JsonObject to combine with </param>
+	/// <returns>A new JsonObject containing values from this and <paramref name="other"/> </returns>
+	public JsonObject Combine(JsonObject other) { return Combine(this, other); }
+
+	/// <summary> Combines <paramref name="first"/> and <paramref name="second"/> into a new JsonObject </summary>
+	/// <param name="first">First JsonObject</param>
+	/// <param name="second">Second JsonObject</param>
+	/// <returns>A new JsonObject with the combined values of first and second (in order)</returns>
+	public static JsonObject Combine(JsonObject first, JsonObject second) { return new JsonObject().Set(first).Set(second); }
+
 
 	/// <summary> Takes all of the pairs from a dictionary, 
 	/// and sets this object to have the JsonValue version of the Values associated with the key </summary>
