@@ -1536,8 +1536,11 @@ public class JsonReflector {
 
 		return sval;
 	}
+
 	/// <summary> Reflect value stored in source JsonObject into a destination object. 
 	/// Will recusively reflect parallel objects into their fields when applicable. </summary>
+	/// <param name="source">JsonObject with data</param>
+	/// <param name="destination">Object to apply data from source to</param>
 	public static void ReflectInto(JsonObject source, object destination) {
 		Type type = destination.GetType();
 		if (type.IsValueType) { throw new Exception("Can't reflect Json into a value type. Use Json.GetValue(JsonValue, Type) instead."); }
@@ -1635,6 +1638,8 @@ public class JsonReflector {
 
 	/// <summary> Get a JsonRepresentation of a given code object. 
 	/// Creates a new JsonValue based on what is needed. </summary>
+	/// <param name="source">object to reflect</param>
+	/// <returns>JsonValue representing the same data as the source object</returns>
 	public static JsonValue Reflect(object source) {
 		if (source == null) { return null; }
 		Type type = source.GetType();
