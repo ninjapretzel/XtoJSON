@@ -57,7 +57,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.6.8";
+	public const string VERSION = "0.7.0";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -68,13 +68,12 @@ public static class Json {
 	/// <summary> Trys to parse a json string into a JsonValue representation. 
 	/// if it fails, catches the exception that was thrown, and returns a null</summary>
 	public static JsonValue TryParse(string json) {
-		try { return Parse(json); }
-		catch {
+		try { return Parse(json); } catch {
 			Console.WriteLine("Error! Couldn't Parse Json!");
 			return null;
 		}
 	}
-	
+
 	/// <summary> Reflect a code object into a JsonValue representation. </summary>
 	public static JsonValue Reflect(object obj) { return JsonReflector.Reflect(obj); }
 
@@ -82,10 +81,9 @@ public static class Json {
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
 	/// <summary> Reflect a JsonValue into a specified type. </summary>
 	public static T GetValue<T>(JsonValue val) {
-		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); }
-		else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
+		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); } else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
 
-		object o = GetValue(val, typeof(T)); 
+		object o = GetValue(val, typeof(T));
 		if (o == null) { return default(T); }
 		return (T)o;
 	}
@@ -165,14 +163,14 @@ public abstract class JsonValue {
 	public static readonly JsonValue NULL = JsonNull.instance;
 
 	/// <summary> Is this JsonValue a JsonNumber? </summary>
-	public bool isNumber { 
+	public bool isNumber {
 		get {
 			if (JsonType == JsonType.String) {
 				double d = 0;
 				return Double.TryParse(stringVal, out d);
 			}
-			return JsonType == JsonType.Number; 
-		} 
+			return JsonType == JsonType.Number;
+		}
 	}
 	/// <summary> Is this JsonValue a JsonString? </summary>
 	public bool isString { get { return JsonType == JsonType.String; } }
@@ -187,16 +185,16 @@ public abstract class JsonValue {
 
 	/// <summary> How many items are in this JsonValue, given it is a collection? </summary>
 	public virtual int Count { get { throw new InvalidOperationException("This JsonValue is not a collection"); } }
-	/// <summary> Indexes the JsonValue as if it was a JsonArray </summary>
-	public virtual JsonValue this[int index] { 
-		get { throw new InvalidOperationException("This JsonValue cannot be indexed with an integer"); }
-		set { throw new InvalidOperationException("This JsonValue cannot be indexed with an integer"); }
+
+
+	/// <summary>Indexes the JsonValue with another JsonValue as the index</summary>
+	/// <param name="index"></param>
+	/// <returns></returns>
+	public virtual JsonValue this[JsonValue index] {
+		get { throw new Exception(this.JsonType.ToString() + " Cannot be indexed!"); }
+		set { throw new Exception(this.JsonType.ToString() + " Cannot be indexed!"); }
 	}
-	/// <summary> Indexes the JsonValue as if it was a JsonObject </summary>
-	public virtual JsonValue this[string key] { 
-		get { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
-		set { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
-	}
+
 
 	/// <summary> Does this JsonValue have a given key, when treated as a JsonObject </summary>
 	public virtual bool ContainsKey(string key) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
@@ -224,11 +222,11 @@ public abstract class JsonValue {
 	}
 
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a float at a given key. </summary>
-	public float GetFloat(string key) { return (float) GetNumber(key); }
+	public float GetFloat(string key) { return (float)GetNumber(key); }
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve an int at a given key. </summary>
-	public int GetInt(string key) { return (int) GetNumber(key); }
+	public int GetInt(string key) { return (int)GetNumber(key); }
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a double at a given key. </summary>
-	public double GetNumber(string key) { 
+	public double GetNumber(string key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
 			if (thing.isNumber) { return thing.numVal; }
@@ -236,7 +234,12 @@ public abstract class JsonValue {
 		return 0;
 	}
 	/// <summary> Get the boolean value of this JsonValue </summary>
-	public virtual bool boolVal { get { throw new InvalidOperationException("This JsonValue is not a boolean"); } }
+	public virtual bool boolVal {
+		get {
+			if (isArray || isObject || isString || isNumber) { return true; }
+			return false;
+		}
+	}
 	/// <summary> Get the double value of this JsonValue </summary>
 	public virtual double numVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
 	/// <summary> Get the float value of this JsonValue </summary>
@@ -270,20 +273,72 @@ public abstract class JsonValue {
 	public static implicit operator JsonValue(int val) { return new JsonNumber(val); }
 
 	/// <summary> Explicit conversion from JsonValue to string </summary>
-	public static explicit operator string(JsonValue val) { return val.stringVal; }
+	public static implicit operator string(JsonValue val) { if (val == null) { val = NULL; } return val.stringVal; }
 	/// <summary> Explicit conversion from JsonValue to bool </summary>
-	public static explicit operator bool(JsonValue val) { return val.boolVal; }
+	public static implicit operator bool(JsonValue val) { if (val == null) { val = NULL; } return val.boolVal; }
 	/// <summary> Explicit conversion from JsonValue to double </summary>
-	public static explicit operator double(JsonValue val) { return val.numVal; }
+	public static implicit operator double(JsonValue val) { if (val == null) { val = NULL; } return val.numVal; }
 	/// <summary> Explicit conversion from JsonValue to decimal </summary>
-	public static explicit operator decimal(JsonValue val) { return (decimal) val.numVal; }
+	public static implicit operator decimal(JsonValue val) { if (val == null) { val = NULL; } return (decimal)val.numVal; }
 	/// <summary> Explicit conversion from JsonValue to float </summary>
-	public static explicit operator float(JsonValue val) { return (float) val.numVal; }
+	public static implicit operator float(JsonValue val) { if (val == null) { val = NULL; } return (float)val.numVal; }
 	/// <summary> Explicit conversion from JsonValue to int </summary>
-	public static explicit operator int(JsonValue val) { return (int) val.numVal; }
+	public static implicit operator int(JsonValue val) { if (val == null) { val = NULL; } return (int)val.numVal; }
 
+	/// <summary> Plus operator on JsonValues </summary>
+	/// <param name="lhs">Left Hand Side</param>
+	/// <param name="rhs">Right Hand Side</param>
+	/// <returns> Javascript equivlent of LHS + RHS </returns>
+	public static JsonValue operator +(JsonValue lhs, JsonValue rhs) {
+		if (lhs == null) { lhs = NULL; }
+		if (rhs == null) { rhs = NULL; }
+		if (lhs.isString || rhs.isString) { return lhs.stringVal + rhs.stringVal; }
+		return lhs.numVal + rhs.numVal;	
+	}
+
+
+	/// <summary> Minus operator on JsonValues </summary>
+	/// <param name="lhs">Left Hand Side</param>
+	/// <param name="rhs">Right Hand Side</param>
+	/// <returns> Javascript equivlent of LHS - RHS </returns>
+	public static JsonValue operator -(JsonValue lhs, JsonValue rhs) {
+		if (lhs == null) { lhs = NULL; }
+		if (rhs == null) { rhs = NULL; }
+		return lhs.numVal - rhs.numVal;
+	}
+
+	/// <summary> Minus operator on JsonValues </summary>
+	/// <param name="lhs">Left Hand Side</param>
+	/// <param name="rhs">Right Hand Side</param>
+	/// <returns> Javascript equivlent of LHS * RHS </returns>
+	public static JsonValue operator *(JsonValue lhs, JsonValue rhs) {
+		if (lhs == null) { lhs = NULL; }
+		if (rhs == null) { rhs = NULL; }
+		return lhs.numVal * rhs.numVal;
+	}
+
+	/// <summary> Minus operator on JsonValues </summary>
+	/// <param name="lhs">Left Hand Side</param>
+	/// <param name="rhs">Right Hand Side</param>
+	/// <returns> Javascript equivlent of LHS / RHS </returns>
+	public static JsonValue operator /(JsonValue lhs, JsonValue rhs) {
+		if (lhs == null) { lhs = NULL; }
+		if (rhs == null) { rhs = NULL; }
+
+		if (rhs.numVal == 0) { 
+			if (lhs > 0) { return double.PositiveInfinity; }
+			if (lhs < 0) { return double.NegativeInfinity; }
+			return double.NaN;
+		}
+
+		return lhs.numVal / rhs.numVal;
+	}
+
+	/// <summary> not-equal operator for JsonValues </summary>
+	/// <param name="a">Left Hand Side</param>
+	/// <param name="b">Right Hand Side</param>
+	/// <returns>the inversion of (a == b) </returns>
 	public static bool operator !=(JsonValue a, object b) { return !(a == b); }
-
 
 	static double NUMBER_TOLERANCE = 1E-16;
 	/// <summary> Override for == operator.
@@ -321,7 +376,7 @@ public abstract class JsonValue {
 				double d = a.doubleVal - val;
 				if (s == 0) { return false; }
 
-				d /= s; 
+				d /= s;
 				if (d < 0) { d *= -1; }
 
 				return d < NUMBER_TOLERANCE;
@@ -433,7 +488,7 @@ public abstract class JsonValueCollection : JsonValue {
 #endregion
 
 
-#region Primitives 
+#region Primitives
 
 /// <summary> Represents a null as a JsonObject </summary>
 public class JsonNull : JsonValue {
@@ -534,8 +589,8 @@ public class JsonNumber : JsonValue {
 #else
 	/// <summary> Internal representation </summary>
 	private double _value;
-
-	public override bool boolVal { get { return _value != 0D && !double.IsNaN(_value); } }
+	
+	public override bool boolVal { get { return _value != 0 && !double.IsNaN(_value); } }
 	public override string stringVal { get { return _value.ToString("###0.#"); } }
 	public override double numVal { get { return _value; } }
 	public override double doubleVal { get { return _value; } }
@@ -546,13 +601,13 @@ public class JsonNumber : JsonValue {
 	internal JsonNumber(double value) : base() { _value = value; }
 
 	/// <summary> int constructor </summary>
-	public JsonNumber(int value) : this(Double.Parse(""+value)) { }
+	public JsonNumber(int value) : this(Double.Parse("" + value)) { }
 	/// <summary> float constructor </summary>
 	public JsonNumber(float value) : this(Double.Parse("" + value)) { }
 	/// <summary> decimal constructor </summary>
 	public JsonNumber(decimal value) : this(Double.Parse("" + value)) { }
 	/// <summary> byte constructor </summary>
-	public JsonNumber(byte value) : this(Double.Parse(""+value)) { }
+	public JsonNumber(byte value) : this(Double.Parse("" + value)) { }
 
 	public override string ToString() { return _value.ToString(formatter); }
 	public override string PrettyPrint() { return _value.ToString(formatter); }
@@ -581,14 +636,17 @@ public class JsonString : JsonValue {
 			if (Double.TryParse(_value, out d)) {
 				return d;
 			}
-			return base.numVal;
+			if (_value.ToLower() == "infinity") { return double.PositiveInfinity; }
+			if (_value.ToLower() == "-infinity") { return double.NegativeInfinity; }
+			
+			return double.NaN;
 		}
 	}
-
-	public override bool boolVal { get { return _value.ToLower().Trim().Equals("true"); } }
+	
+	public override bool boolVal { get { return _value.Length > 0; } }
 	public override double doubleVal { get { return numVal; } }
-	public override int intVal { get { return (int) numVal; } }
-	public override float floatVal { get { return (float) numVal; } }
+	public override int intVal { get { return (int)numVal; } }
+	public override float floatVal { get { return (float)numVal; } }
 
 	public override string stringVal { get { return _value; } }
 	public override JsonType JsonType { get { return JsonType.String; } }
@@ -652,10 +710,10 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 			string[] content = line.Split(sep);
 			string objkey = content[keyIndex];
-			
+
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
 				string str = content[k];
-				
+
 				if (str != null && str != "") {
 					string key = keys[k];
 					double val = 0;
@@ -680,8 +738,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 		return ret;
 	}
-	
-	
+
+
 	protected override string BeginMarker { get { return "{"; } }
 	protected override string EndMarker { get { return "}"; } }
 
@@ -693,15 +751,32 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 	public override JsonType JsonType { get { return JsonType.Object; } }
 	public override int Count { get { return data.Count; } }
-	public override JsonValue this[string key] {
-		get { 
-			if (key == null) { return NULL; }
-			if (data.ContainsKey(key)) { return data[key]; } 
-			return NULL; 
+	public override JsonValue this[JsonValue key] {
+		get {
+			if (key.isString) {
+				if (data.ContainsKey((JsonString)key)) { return data[(JsonString)key]; }
+				return NULL;
+			} else if (key.isBool || key.isNumber) {
+				string k = key.stringVal;
+				if (data.ContainsKey(k)) { return data[k]; }
+				return NULL;
+			} else {
+				throw new Exception(key.JsonType.ToString() + " is not a valid key for " + JsonType.ToString());
+			}
 		}
-		set { 
-			if (value == null && data.ContainsKey(key)) { data.Remove(key); }
-			if (value != null) { data[key] = value; }
+
+		set {
+			if (key.isString) {
+				if (value == null && data.ContainsKey((JsonString)key)) { data.Remove((JsonString)key); }
+				if (value != null) { data[(JsonString)key] = value; }
+			} else if (key.isBool || key.isNumber) {
+				string k = key.stringVal;
+				if (value == null && data.ContainsKey(k)) { data.Remove(k); }
+				if (value != null) { data[k] = value; }
+			} else {
+				throw new Exception(key.JsonType.ToString() + " is not a valid key for " + JsonType.ToString());
+			}
+
 		}
 	}
 
@@ -728,12 +803,14 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 
 	/// <summary> Initialize with an array of key,value pairs</summary>
 	/// <param name="pairs">Pairs of values to use. Must be even in length, and contain 'JsonString,JsonValue' pairs</param>
-	public JsonObject(params JsonValue[] pairs) : this() {
-		
+	public JsonObject(params JsonValue[] pairs)
+		: this() {
+
 		if (pairs.Length % 2 == 0) {
-			for (int i = 0; i < pairs.Length; i+=2) {
-				JsonString key = (JsonString) pairs[i];
-				JsonValue val = pairs[i+1];
+			for (int i = 0; i < pairs.Length; i += 2) {
+				JsonString key = (JsonString)pairs[i];
+				JsonValue val = pairs[i + 1];
+				if (val == null || val == JsonNull.instance) { continue; }
 
 				data.Add(key, val);
 			}
@@ -758,7 +835,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return this;
 	}
 
-	
+
 	/// <summary> Adds all of the entries in a Dictionary<string, JsonValue> 
 	/// or other type of Enumerable group of pairs of <string, JsonValue> </summary>
 	public JsonObject AddAll<T>(IEnumerable<KeyValuePair<string, T>> info) where T : JsonValue {
@@ -783,11 +860,11 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Attempt to get a primitive type from a given key and given type.</summary>
 	public object GetPrimitive(string name, Type type) {
 		JsonValue val = this[name];
-		if (type == typeof(string) 	&& val.isString) { return val.stringVal; }
-		if (type == typeof(float) 	&& val.isNumber) { return val.floatVal; } 
-		if (type == typeof(double) 	&& val.isNumber) { return val.numVal; } 
-		if (type == typeof(int) 	&& val.isNumber) { return val.intVal; } 
-		if (type == typeof(bool) 	&& val.isBool) { return val.boolVal; }
+		if (type == typeof(string) && val.isString) { return val.stringVal; }
+		if (type == typeof(float) && val.isNumber) { return val.floatVal; }
+		if (type == typeof(double) && val.isNumber) { return val.numVal; }
+		if (type == typeof(int) && val.isNumber) { return val.intVal; }
+		if (type == typeof(bool) && val.isBool) { return val.boolVal; }
 		if (type.IsNumeric() && val.isString) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
@@ -821,25 +898,25 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary>Try to get a T from this object. 
 	/// Returns the T if it can be found.
 	/// If a T cannot be found, returns a default value. </summary>
-	public T Extract<T>( string key, T defaultValue = default(T) ) {
+	public T Extract<T>(string key, T defaultValue = default(T)) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
 
-			if (val.JsonType == Json.ReflectedType(defaultValue) ) { return Json.GetValue<T>(val); }
+			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
 	}
 
 	public JsonArray ToJsonArray() {
 		JsonArray arr = new JsonArray();
-		foreach (var pair in this) { 
+		foreach (var pair in this) {
 			arr.Add(pair.Value);
 		}
 		return arr;
 	}
 
 	/// <summary> Returns the internal Dictionary's Enumerator </summary>
-	IEnumerator IEnumerable.GetEnumerator() { return data.GetEnumerator(); } 
+	IEnumerator IEnumerable.GetEnumerator() { return data.GetEnumerator(); }
 	/// <summary> Returns the internal Dictionary's Enumerator</summary>
 	public IEnumerator<KeyValuePair<JsonString, JsonValue>> GetEnumerator() { return data.GetEnumerator(); }
 	/// <summary> Returns the internal Dictionary's Enumerator </summary>
@@ -890,7 +967,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	}
 
 	/// <summary> Removes the KeyValue pair associated with the given key </summary>
-	public JsonObject Remove(string key) { 
+	public JsonObject Remove(string key) {
 		if (ContainsKey(key)) { data.Remove(key); }
 		return this;
 	}
@@ -947,7 +1024,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Combines this and <paramref name="other"/> into a new JsonObject, recursively </summary>
 	/// <param name="other">other JsonObject to combine with </param>
 	/// <returns>A new JsonObject with the combined values of this and other (in order) </returns>
-	public JsonObject CombineRecursively(JsonObject other) { 
+	public JsonObject CombineRecursively(JsonObject other) {
 		JsonObject obj = new JsonObject().Set(this);
 		foreach (var pair in other) {
 			var objOfKey = obj[pair.Key];
@@ -964,8 +1041,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <param name="first">First JsonObject</param>
 	/// <param name="second">Second JsonObject</param>
 	/// <returns>A new JsonObject with the combined values of first and second (in order)</returns>
-	public static JsonObject CombineRecursively(JsonObject first, JsonObject second) { 
-		return first.CombineRecursively(second);	
+	public static JsonObject CombineRecursively(JsonObject first, JsonObject second) {
+		return first.CombineRecursively(second);
 	}
 
 	/// <summary> Takes all of the KeyValue pairs from the other object, and sets this object to have the same values for those keys. </summary>
@@ -1091,7 +1168,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 			string[] content = line.Split(sep);
 			for (int k = 0; k < keys.Length && k < content.Length; k++) {
 				string str = content[k];
-				
+
 				if (str != null && str != "") {
 					string key = keys[k];
 					double val = 0;
@@ -1124,9 +1201,26 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 
 	public override JsonType JsonType { get { return JsonType.Array; } }
 	public override int Count { get { return list.Count; } }
-	public override JsonValue this[int index] { 
-		get { return list[index]; }
-		set { list[index] = value; }
+	public override JsonValue this[JsonValue index] {
+		get {
+			if (index.isNumber || index.isString) {
+				int ind = index.intVal;
+				if (ind > 0 || ind < list.Count) { return list[ind]; }
+				return NULL;
+			} else {
+				throw new Exception(index.JsonType.ToString() + " is not a valid index for JsonArray!");
+			}
+		}
+		set {
+			if (index.isNumber || index.isString) {
+				int ind = index.intVal;
+				if (ind >= 0 && ind < Count) { list[ind] = value; } 
+				else if (ind == Count) { list.Add(value); }
+				else { throw new Exception("Index " + ind + " is out of bounds!"); }
+			} else {
+				throw new Exception(index.JsonType.ToString() + " is not a valid index for JsonArray!");
+			}
+		}
 	}
 
 	/// <summary> Default Constructor, creates an empty list </summary>
@@ -1135,27 +1229,35 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	public JsonArray(List<JsonValue> values) : base() { list = values; }
 	/// <summary> Creates a new JsonArray and copies all elements from another list. </summary>
 	public JsonArray(JsonArray src) : this() { AddAll(src); }
+	/// <summary> Creates a new JsonArray with an array of values</summary>
+	public JsonArray(params JsonValue[] values) : this() { AddAll(values); }
+
+	/// <summary> Convert arbitrary Array to JsonArray </summary>
+	/// <param name="a">Array to convert </param>
+	/// <returns>JsonArray with reflections of all objects in <paramref name="a"/></returns>
+	public static implicit operator JsonArray(Array a) {
+		JsonArray arr = new JsonArray();
+		foreach (var obj in a) {arr.Add(Json.Reflect(obj)); }
+		return arr;
+	}
 
 	/// <summary> Creates a copy of this JsonArray </summary>
 	public JsonArray Clone() { return new JsonArray(this); }
 
 	/// <summary> Adds a single JsonValue into this list </summary>
 	public JsonArray Add(JsonValue val) { list.Add(val); return this; }
-	/// <summary> Add all JsonValues from a collection </summary>
-	public JsonArray AddAll(IEnumerable<JsonValue> info) {
-		foreach (JsonValue val in info) { Add(val); }
+
+	/// <summary> Add all items in an arbitrary array, and return the modified object. </summary>
+	/// <param name="arr">Array to add</param>
+	/// <returns>The object on which this method was called</returns>
+	public JsonArray AddAll<T>(IEnumerable<T> arr) {
+		foreach (var val in arr) {  Add(Json.Reflect(val));  }
 		return this;
 	}
 
-
-	/// <summary> Add all JsonValues that are contained in a collection </summary>
-	public JsonArray AddAll<T>(IEnumerable<T> info) where T : JsonValue {
-		foreach (T val in info) { Add( (JsonValue) val ); }
-		return this;
-	}
 	/// <summary> Add reflections of all objects that are contained in a collection </summary>
-	public JsonArray AddAllReflect<T>(IEnumerable<T> info) { 
-		foreach (T val in info) { Add( Json.Reflect(val) ); }
+	public JsonArray AddAllReflect<T>(IEnumerable<T> info) {
+		foreach (T val in info) { Add(Json.Reflect(val)); }
 		return this;
 	}
 
@@ -1178,11 +1280,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	/// <summary> Returns the internal list's Enumerator </summary>
 	public IEnumerator<JsonValue> GetEnumerator() { return list.GetEnumerator(); }
 
-	public static implicit operator string[](JsonArray a) { return a.OnlyStringsToArray(); }
-	public static implicit operator double[](JsonArray a) { return a.OnlyNumbersToArray(); }
-	public static implicit operator float[](JsonArray a) { return a.OnlyFloatsToArray(); }
-	public static implicit operator int[](JsonArray a) { return a.OnlyIntToArray(); }
-	
+
 	/// <summary>
 	/// Searches through the array for an object with a key matching a string value
 	/// </summary>
@@ -1211,7 +1309,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		foreach (var val in this) {
 			JsonObject obj = val as JsonObject;
 			if (obj != null) {
-				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key)-value) < tolerance) {
+				if (obj.ContainsKey(key) && Math.Abs(obj.Get<double>(key) - value) < tolerance) {
 					return obj;
 				}
 			}
@@ -1274,7 +1372,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 
-	
+
 
 	/// <summary> Get an array of all JsonNumbers as int values  </summary>
 	public int[] OnlyIntToArray() { return OnlyIntToList().ToArray(); }
@@ -1323,7 +1421,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		}
 		return arr;
 	}
-	
+
 	/// <summary> Get an array of all primitive elements in the JsonArray as strings </summary>
 	/// <returns> A string[] of all primitive elements in the JsonArray as strings </returns>
 	public string[] ToStringArray() { return ToStringList().ToArray(); }
@@ -1347,31 +1445,23 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 
-	
+
 
 	/// <summary> Get an array of all JsonObjects as T values  </summary>
 	public T[] ToArrayOf<T>() { return ToListOf<T>().ToArray(); }
 	/// <summary> Get a list of all JsonNumbers as T values  </summary>
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
-		ConstructorInfo constructor = type.GetConstructor(new Type[]{}); 
+		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
 
 		List<T> arr = new List<T>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
 			T sval = default(T);
 			bool setVal = false;
-			if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; }
-			else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; }
-			else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; }
-			else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; }
-			else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; }
-			else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; }
-			else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; }
-			else if (val.isNull) { sval = (T)(object)null; }
-			else if (val.isObject) {
+			if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; } else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; } else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; } else if (val.isNull) { sval = (T)(object)null; } else if (val.isObject) {
 				JsonObject jobj = val as JsonObject;
-				object obj = (object) constructor.Invoke(new object[]{});
+				object obj = (object)constructor.Invoke(new object[] { });
 				JsonReflector.ReflectInto(jobj, obj);
 				sval = (T)obj;
 				setVal = true;
@@ -1386,21 +1476,13 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 	public object[] ToObjectArray(Type type) { return ToObjectList(type).ToArray(); }
 	/// <summary> Get a list of all JsonObjects as object values  </summary>
 	public List<object> ToObjectList(Type type) {
-		ConstructorInfo constructor = type.GetConstructor(new Type[]{});
+		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
 
 		List<object> arr = new List<object>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
-			if (val.isString && type == typeof(string)) { arr.Add(val.stringVal); }
-			else if (val.isNumber && type == typeof(double)) { arr.Add(val.numVal); }
-			else if (val.isNumber && type == typeof(int)) { arr.Add((int)val.numVal); }
-			else if (val.isNumber && type == typeof(float)) { arr.Add((float)val.numVal); }
-			else if (val.isNumber && type == typeof(byte)) { arr.Add((byte)val.numVal); }
-			else if (val.isNumber && type == typeof(long)) { arr.Add((long)val.numVal); }
-			else if (val.isBool && type == typeof(bool)) { arr.Add(val.boolVal); }
-			else if (val.isNull) { arr.Add(null); }
-			else if (val.isObject && constructor != null) {
-				object obj = constructor.Invoke(new object[]{});
+			if (val.isString && type == typeof(string)) { arr.Add(val.stringVal); } else if (val.isNumber && type == typeof(double)) { arr.Add(val.numVal); } else if (val.isNumber && type == typeof(int)) { arr.Add((int)val.numVal); } else if (val.isNumber && type == typeof(float)) { arr.Add((float)val.numVal); } else if (val.isNumber && type == typeof(byte)) { arr.Add((byte)val.numVal); } else if (val.isNumber && type == typeof(long)) { arr.Add((long)val.numVal); } else if (val.isBool && type == typeof(bool)) { arr.Add(val.boolVal); } else if (val.isNull) { arr.Add(null); } else if (val.isObject && constructor != null) {
+				object obj = constructor.Invoke(new object[] { });
 				JsonObject jobj = val as JsonObject;
 				JsonReflector.ReflectInto(jobj, obj);
 				arr.Add(obj);
@@ -1446,7 +1528,7 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 #endregion
 
 
-#region Reflector 
+#region Reflector
 
 /// <summary> Class containing Reflection Code </summary>
 public class JsonReflector {
@@ -1487,31 +1569,22 @@ public class JsonReflector {
 		if (val == null || blacklist.Contains(destType)) { return null; }
 
 		object sval = null;
-		if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
-		else if (val.isString && destType.IsNumeric()) { 
+		if (val.isString && destType == typeof(string)) { sval = val.stringVal; } else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
 			sval = Convert.ChangeType(numVal, destType);
-		}
-		else if (val.isString && destType.IsEnum) { 
+		} else if (val.isString && destType.IsEnum) {
 			try {
 				sval = Enum.Parse(destType, val.stringVal);
 			} catch {
 				sval = Enum.ToObject(destType, 0);
 			}
-		}
-		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; }
-		else if (val.isNumber && destType == typeof(float)) { sval = (float) val.numVal; }
-		else if (val.isNumber && destType == typeof(int)) { sval = (int) val.numVal; }
-		else if (val.isNumber && destType == typeof(byte)) { sval = (byte) val.numVal; }
-		else if (val.isNumber && destType == typeof(long)) { sval = (long) val.numVal; }
-		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; }
-		else if (val.isArray && destType.IsArray) {
+		} else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } else if (val.isArray && destType.IsArray) {
 			//TBD: Reflect the JsonArray into a new array
 			JsonArray arr = val as JsonArray;
 			Type eleType = destType.GetElementType();
 			MethodInfo genericGrabber = toArrayOf.MakeGenericMethod(eleType);
-			sval = genericGrabber.Invoke(arr, new object[]{});
+			sval = genericGrabber.Invoke(arr, new object[] { });
 
 		} else if (val.isObject) {
 			//TBD: Reflect the JsonObject into a new object of that type
@@ -1547,7 +1620,7 @@ public class JsonReflector {
 
 		var data = source.GetData();
 
-		PropertyInfo mapper = type.GetProperty("Item", new Type[]{typeof(string)});
+		PropertyInfo mapper = type.GetProperty("Item", new Type[] { typeof(string) });
 		Type mapperValueType = null;
 		MethodInfo mapperSetMethod = null;
 
@@ -1556,13 +1629,13 @@ public class JsonReflector {
 			mapperSetMethod = mapper.GetSetMethod();
 		}
 
-		PropertyInfo indexer = type.GetProperty("Item", new Type[]{typeof(int)});
+		PropertyInfo indexer = type.GetProperty("Item", new Type[] { typeof(int) });
 		Type indexerValueType = null;
 		MethodInfo adder = null;
 
 		if (indexer != null) {
 			indexerValueType = indexer.PropertyType;
-			adder = type.GetMethod("Add", new Type[]{indexerValueType});
+			adder = type.GetMethod("Add", new Type[] { indexerValueType });
 		}
 
 		JsonArray _ITEMS = null;
@@ -1584,7 +1657,7 @@ public class JsonReflector {
 				object sval = GetReflectedValue(val, destType);
 
 				if (sval != null) {
-					setMethod.Invoke(destination, new object[]{sval});
+					setMethod.Invoke(destination, new object[] { sval });
 				}
 
 				//If there exists a property by a name, there is likely no field by the same name
@@ -1613,7 +1686,7 @@ public class JsonReflector {
 				object sval = GetReflectedValue(val, mapperValueType);
 
 				if (sval != null) {
-					mapperSetMethod.Invoke(destination, new object[] {key, sval});
+					mapperSetMethod.Invoke(destination, new object[] { key, sval });
 				}
 
 				continue;
@@ -1627,7 +1700,7 @@ public class JsonReflector {
 			for (int i = 0; i < list.Count; i++) {
 				JsonValue val = list[i];
 				object sval = GetReflectedValue(val, indexerValueType);
-				adder.Invoke(destination, new object[]{sval} );
+				adder.Invoke(destination, new object[] { sval });
 				//indexerSetMethod.Invoke(destination, new object[] {i,sval}); 
 			}
 
@@ -1650,15 +1723,7 @@ public class JsonReflector {
 		JsonValue jval = null;
 
 		//Handle primitive types
-		if (type == typeof(string)) { return ((string)source); }
-		else if (type == typeof(double)) { return ((double)source); }
-		else if (type == typeof(int)) { return ((int)source); }
-		else if (type == typeof(float)) { return ((float)source); }
-		else if (type == typeof(byte)) { return ((byte)source); }
-		else if (type == typeof(long)) { return ((long)source); }
-		else if (type == typeof(short)) { return ((short)source); }
-		else if (type == typeof(bool)) { return ((bool)source); }
-		else if (type.IsArray) {
+		if (type == typeof(string)) { return ((string)source); } else if (type == typeof(double)) { return ((double)source); } else if (type == typeof(int)) { return ((int)source); } else if (type == typeof(float)) { return ((float)source); } else if (type == typeof(byte)) { return ((byte)source); } else if (type == typeof(long)) { return ((long)source); } else if (type == typeof(short)) { return ((short)source); } else if (type == typeof(bool)) { return ((bool)source); } else if (type.IsArray) {
 			JsonArray arr = new JsonArray();
 			jval = arr;
 			Array obj = source as Array;
@@ -1669,10 +1734,10 @@ public class JsonReflector {
 		} else {
 			PropertyInfo keys = type.GetProperty("Keys");
 
-			PropertyInfo mapper = type.GetProperty("Item", new Type[]{typeof(string)});
+			PropertyInfo mapper = type.GetProperty("Item", new Type[] { typeof(string) });
 
 			PropertyInfo count = type.GetProperty("Count", typeof(int));
-			PropertyInfo indexer = type.GetProperty("Item", new Type[]{typeof(int)});
+			PropertyInfo indexer = type.GetProperty("Item", new Type[] { typeof(int) });
 
 			PropertyInfo[] properties = type.GetProperties(publicMembers);
 			FieldInfo[] fields = type.GetFields(publicMembers);
@@ -1688,7 +1753,7 @@ public class JsonReflector {
 			if (blacklist == null) { blacklist = new string[0]; }
 
 
-			if (keys != null 
+			if (keys != null
 				&& mapper != null
 				&& !mapper.IsObsolete()
 				&& typeof(IEnumerable<string>).IsAssignableFrom(keys.PropertyType)) {
@@ -1700,7 +1765,7 @@ public class JsonReflector {
 				foreach (string key in sKeys) {
 					if (blacklist.Contains<string>(key)) { continue; }
 
-					object mappedObj = mapperGet.Invoke(source, new object[]{key});
+					object mappedObj = mapperGet.Invoke(source, new object[] { key });
 					obj.Add(key, Reflect(mappedObj));
 				}
 
@@ -1712,7 +1777,7 @@ public class JsonReflector {
 				MethodInfo indexerGet = indexer.GetGetMethod();
 				int cnt = (int)countGet.Invoke(source, null);
 				for (int i = 0; i < cnt; i++) {
-					object indexedObj = indexerGet.Invoke(source, new object[]{i});
+					object indexedObj = indexerGet.Invoke(source, new object[] { i });
 					arr.Add(Reflect(indexedObj));
 				}
 				obj.Add("_ITEMS", arr);
@@ -1721,8 +1786,8 @@ public class JsonReflector {
 			foreach (PropertyInfo property in properties) {
 
 				if (property.Name == "Item"
-					|| blacklist.Contains<string>(property.Name) 
-					|| !property.IsWritable() 
+					|| blacklist.Contains<string>(property.Name)
+					|| !property.IsWritable()
 					|| !property.IsReadable()
 					|| property.IsObsolete()) { continue; }
 
@@ -1788,7 +1853,7 @@ public class JsonDeserializer {
 	JsonValue ProcessValue() {
 		if (next == '[') { return ProcessArray(); }
 		if (next == '{') { return ProcessObject(); }
-		if (next == '"') { 
+		if (next == '"') {
 			string val = ProcessString();
 			val = val.JsonUnescapeString();
 			//TBD: Additional processing if needed
@@ -1800,7 +1865,7 @@ public class JsonDeserializer {
 		while (index < json.Length && next != ',' && next != '}' && next != ']' && !char.IsWhiteSpace(next)) {
 			index++;
 		}
-		string jval = json.Substring(startIndex, index-startIndex);
+		string jval = json.Substring(startIndex, index - startIndex);
 
 		if (jval == "true") { return true; }
 		if (jval == "false") { return false; }
@@ -1869,7 +1934,6 @@ public class JsonDeserializer {
 			index++;
 			return obj;
 		}
-
 		while (true) {
 			string key = ProcessKey();
 			SkipWhitespace();
@@ -1892,7 +1956,7 @@ public class JsonDeserializer {
 #if XtoJSON_StrictCommaRules
 				throw new Exception("Commas before end characters not allowed.");
 #else
-				index++; 
+				index++;
 				return false;
 #endif
 			}
@@ -1912,14 +1976,20 @@ public class JsonDeserializer {
 	/// <summary> Logic for extracting a string value from the text </summary>
 	string ProcessKey() {
 		int startIndex = index + 1;
-		int matchQuote = -1;
-		while (json[index++] != ':' || matchQuote == -1) { 
-			if (json[index] == '\"' && json[index-1] != '\\') {
-				matchQuote = index;
+		int endIndex = -1;
+
+		if (next == '"') {
+			while (json[index++] != ':' || endIndex == -1) {
+				if (json[index] == '\"' && json[index - 1] != '\\') {
+					endIndex = index;
+				}
 			}
+			return json.Substring(startIndex, endIndex - startIndex).TrimEnd();
 		}
-		string result = json.Substring(startIndex, matchQuote - startIndex).TrimEnd();
-		return result;
+		startIndex = index;
+		endIndex = json.IndexOf(':', index);
+		index = endIndex+1;
+		return json.Substring(startIndex, endIndex - startIndex).TrimEnd();
 	}
 
 	/// <summary> Logic to skip over whitespace until a non whitespace character or the end of the file. </summary>
@@ -1942,7 +2012,7 @@ public static class JsonHelpers {
 
 	/// <summary> Escape characters to escape inside of Json text </summary>
 	static string[] TOESCAPE = new string[] { "\\", "\"", "\b", "\f", "\n", "\r", "\t" };
-	
+
 	/// <summary> Escape character codes to use for escapes</summary>
 	static string[] ESCAPE_CODES = new string[] { "\\\\", "\\\"", "\\b", "\\f", "\\n", "\\r", "\\t" };
 
@@ -2010,9 +2080,9 @@ public static class JsonHelpers {
 
 	/// <summary> Call the constructor of a Type, calling an empty constructor if it exists. </summary>
 	public static object GetNewInstance(this Type type) {
-		ConstructorInfo constructor = type.GetConstructor(new Type[] {});
+		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
 		if (constructor != null) {
-			return constructor.Invoke(new object[] {});
+			return constructor.Invoke(new object[] { });
 		}
 		return null;
 	}
@@ -2030,7 +2100,7 @@ public static class JsonHelpers {
 	}
 
 }
-#endregion 
+#endregion
 
 #region Functional Operations
 
@@ -2154,7 +2224,7 @@ public static class JsonOperations {
 	public static double MultiplyRow(this JsonObject lhs, JsonObject rhs) {
 		double d = 0;
 
-		foreach (var pair in rhs) { 
+		foreach (var pair in rhs) {
 			if (pair.Value.isNumber) { d += lhs.GetNumber(pair.Key.stringVal) * pair.Value.numVal; }
 		}
 
@@ -2193,8 +2263,7 @@ public static class JsonOperations {
 
 	/// <summary> Clamp a value. by default range is [0, 1]</summary>
 	static double Clamp(double val, double min = 0, double max = 1) {
-		if (val < min) { return min; } 
-		else if ( val > max) { return max; } 
+		if (val < min) { return min; } else if (val > max) { return max; }
 		return val;
 	}
 
@@ -2210,7 +2279,7 @@ public static class JsonOperations {
 			}
 
 			foreach (var pair in rhs) {
-				if (pair.Value.isNumber) { 
+				if (pair.Value.isNumber) {
 					double a = result.GetNumber(pair.Key.stringVal);
 					double b = Clamp(pair.Value.numVal);
 
@@ -2244,7 +2313,7 @@ public static class JsonOperations {
 		foreach (var pair in obj) {
 			string key = pair.Key.stringVal;
 
-			if ( ("" == prefix || key.StartsWith(prefix)) 
+			if (("" == prefix || key.StartsWith(prefix))
 				&& ("" == suffix || key.EndsWith(suffix))
 				&& ("" == contains || key.Contains(contains))) {
 
