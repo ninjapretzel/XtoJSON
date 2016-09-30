@@ -1593,6 +1593,13 @@ public class JsonReflector {
 			if (destType.IsValueType) {
 				object boxedValue = Activator.CreateInstance(destType);
 				FieldInfo[] fields = destType.GetFields();
+				
+#if UNITY
+				if (destType == typeof(Quaternion)) {
+					Debug.Log("OY CUNT");
+					fields = fields.Where((field)=>(field.Name != "eulerAngles")).ToArray();
+				}
+#endif
 				foreach (FieldInfo field in fields) {
 					object innerVal = GetReflectedValue(jobj[field.Name], field.FieldType);
 					if (innerVal != null) {
@@ -1791,10 +1798,13 @@ public class JsonReflector {
 					|| !property.IsReadable()
 					|| property.IsObsolete()) { continue; }
 
+#if UNITY
+				if (type == typeof(Quaternion) && property.Name == "eulerAngles") { continue; }
 #if UNITY_5
 				//Why did they not mark this obsolete? Can't automatically detect it...
-				if (property.Name == "useConeFriction") { continue; }
-#endif
+				if (type == typeof(Rigidbody) && property.Name == "useConeFriction") { continue; }
+#endif // UNITY_5 
+#endif // UNITY
 
 				MethodInfo propGet = property.GetGetMethod();
 
