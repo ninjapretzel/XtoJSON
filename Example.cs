@@ -42,7 +42,7 @@ public class JsonExample {
 	public static void Print(object o) {}
 	public static void Print(string s) {}
 #else
-	public static void Print(object o) { Console.WriteLine(o.ToString(); }
+	public static void Print(object o) { Console.WriteLine(o.ToString()); }
 	public static void Print(string s) { Console.WriteLine(s); }
 #endif
 
@@ -428,7 +428,7 @@ public class JsonTests {
 	public static void Print(object o) {}
 	public static void Print(string s) {}
 #else
-	public static void Print(object o) { Console.WriteLine(o.ToString(); }
+	public static void Print(object o) { Console.WriteLine(o.ToString()); }
 	public static void Print(string s) { Console.WriteLine(s); }
 #endif
 
