@@ -1596,7 +1596,6 @@ public class JsonReflector {
 				
 #if UNITY
 				if (destType == typeof(Quaternion)) {
-					Debug.Log("OY CUNT");
 					fields = fields.Where((field)=>(field.Name != "eulerAngles")).ToArray();
 				}
 #endif
