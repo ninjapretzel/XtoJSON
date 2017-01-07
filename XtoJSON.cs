@@ -31,7 +31,8 @@
 //	Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 //May have minor performance implications when enabled.
 
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5
+//Unity detection
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_6 
 #define UNITY
 using UnityEngine;
 
@@ -46,18 +47,25 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Linq;
 
-
-
-
 #region Abstract/Primary stuff
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonType
 
 /// <summary>Enum of all types supported by XtoJSON</summary>
 public enum JsonType { String, Boolean, Number, Object, Array, Null }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//Json
+
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.7.0";
+	public const string VERSION = "0.7.1";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -153,14 +161,23 @@ public static class Json {
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonValue
+
 /// <summary> Base class for all representations of Json values </summary>
 public abstract class JsonValue {
 
 	protected readonly string HORIZONTAL_TAB = "\t";
+	[System.Obsolete("Not thread safe.")]
 	public static int CURRENT_INDENT = 0;
 
 	/// <summary> Base JsonNull null reference </summary>
 	public static readonly JsonValue NULL = JsonNull.instance;
+	
+	/// <summary> Hidden constructor. </summary>
+	internal JsonValue() { }
 
 	/// <summary> Is this JsonValue a JsonNumber? </summary>
 	public bool isNumber {
@@ -188,13 +205,12 @@ public abstract class JsonValue {
 
 
 	/// <summary>Indexes the JsonValue with another JsonValue as the index</summary>
-	/// <param name="index"></param>
-	/// <returns></returns>
+	/// <param name="index">JsonValue to use as an index. Converted to a string for JsonObject, and converted to an int for JsonArray </param>
+	/// <returns>Item at the given index, if the type can be indexed. </returns>
 	public virtual JsonValue this[JsonValue index] {
 		get { throw new Exception(this.JsonType.ToString() + " Cannot be indexed!"); }
 		set { throw new Exception(this.JsonType.ToString() + " Cannot be indexed!"); }
 	}
-
 
 	/// <summary> Does this JsonValue have a given key, when treated as a JsonObject </summary>
 	public virtual bool ContainsKey(string key) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
@@ -236,7 +252,9 @@ public abstract class JsonValue {
 	/// <summary> Get the boolean value of this JsonValue </summary>
 	public virtual bool boolVal {
 		get {
-			if (isArray || isObject || isString || isNumber) { return true; }
+			if (isArray || isObject || (isString && stringVal.Length > 0) || (isNumber && numVal != 0)) { 
+				return true; 
+			}
 			return false;
 		}
 	}
@@ -251,14 +269,11 @@ public abstract class JsonValue {
 	/// <summary> Get the string value of this JsonValue </summary>
 	public virtual string stringVal { get { throw new InvalidOperationException("This JsonValue is not a string"); } }
 
-	/// <summary> Hidden constructor. </summary>
-	internal JsonValue() { }
-
 	/// <summary> Get the JsonType of this JsonValue. Fixed, based on the subclass. </summary>
 	public abstract JsonType JsonType { get; }
 	/// <summary> Get the string representation of this JsonValue. </summary>
 	public abstract override string ToString();
-	/// <summary> Get a pretty string representation of this JsonValue. </summary>
+	/// <summary> Get a pretty string representation of this JsonValue. Defaults to indentLevel = 0 </summary>
 	public abstract string PrettyPrint();
 
 	/// <summary> Implicit conversion from string to JsonValue </summary>
@@ -272,17 +287,17 @@ public abstract class JsonValue {
 	/// <summary> Implicit conversion from int to JsonValue </summary>
 	public static implicit operator JsonValue(int val) { return new JsonNumber(val); }
 
-	/// <summary> Explicit conversion from JsonValue to string </summary>
+	/// <summary> implicit conversion from JsonValue to string </summary>
 	public static implicit operator string(JsonValue val) { if (val == null) { val = NULL; } return val.stringVal; }
-	/// <summary> Explicit conversion from JsonValue to bool </summary>
+	/// <summary> implicit conversion from JsonValue to bool </summary>
 	public static implicit operator bool(JsonValue val) { if (val == null) { val = NULL; } return val.boolVal; }
-	/// <summary> Explicit conversion from JsonValue to double </summary>
+	/// <summary> implicit conversion from JsonValue to double </summary>
 	public static implicit operator double(JsonValue val) { if (val == null) { val = NULL; } return val.numVal; }
-	/// <summary> Explicit conversion from JsonValue to decimal </summary>
+	/// <summary> implicit conversion from JsonValue to decimal </summary>
 	public static implicit operator decimal(JsonValue val) { if (val == null) { val = NULL; } return (decimal)val.numVal; }
-	/// <summary> Explicit conversion from JsonValue to float </summary>
+	/// <summary> implicit conversion from JsonValue to float </summary>
 	public static implicit operator float(JsonValue val) { if (val == null) { val = NULL; } return (float)val.numVal; }
-	/// <summary> Explicit conversion from JsonValue to int </summary>
+	/// <summary> implicit conversion from JsonValue to int </summary>
 	public static implicit operator int(JsonValue val) { if (val == null) { val = NULL; } return (int)val.numVal; }
 
 	/// <summary> Plus operator on JsonValues </summary>
@@ -441,7 +456,7 @@ public abstract class JsonValue {
 				}
 				return false;
 			default: // Default - a is JsonNull.instance
-				return (b == null || b == JsonNull.instance);
+				return (b == null || ReferenceEquals(b, JsonNull.instance));
 		}
 	}
 
@@ -451,7 +466,13 @@ public abstract class JsonValue {
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonValueCollection
+
 /// <summary> Base class for JsonValues that hold a group of objects </summary>
+[System.Obsolete("No reason to have this abstract base class. No Real functionality needs to be defined here. Please use JsonObject or JsonArray as types instead.")]
 public abstract class JsonValueCollection : JsonValue {
 
 	protected readonly string JsonVALUE_SEPARATOR = ",";
@@ -487,8 +508,12 @@ public abstract class JsonValueCollection : JsonValue {
 
 #endregion
 
-
 #region Primitives
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonNull
 
 /// <summary> Represents a null as a JsonObject </summary>
 public class JsonNull : JsonValue {
@@ -513,6 +538,11 @@ public class JsonNull : JsonValue {
 	public override string PrettyPrint() { return _value; }
 
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonBool
 
 /// <summary> bool type represented as a JsonValue. </summary>
 public class JsonBool : JsonValue {
@@ -544,6 +574,11 @@ public class JsonBool : JsonValue {
 	public override string PrettyPrint() { return ToString(); }
 
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonNumber
 
 /// <summary> Representation of a number as a JsonValue </summary>
 public class JsonNumber : JsonValue {
@@ -625,6 +660,11 @@ public class JsonNumber : JsonValue {
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonString
+
 /// <summary> Representation of a string as a JsonValue </summary>
 public class JsonString : JsonValue {
 	/// <summary> Internal representation </summary>
@@ -674,13 +714,17 @@ public class JsonString : JsonValue {
 
 }
 
-
 #endregion
 
-
 #region Composites
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonObject
+
 /// <summary> Representation of arbitrary object types as JsonObjects </summary>
-public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonString, JsonValue>> {
+public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonValue>> {
 
 	/// <summary>
 	/// Parses a standard CSV-format spreadsheet into a JsonObject.
@@ -739,17 +783,12 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return ret;
 	}
 
-
-	protected override string BeginMarker { get { return "{"; } }
-	protected override string EndMarker { get { return "}"; } }
-
 	/// <summary> Internal representation of information. </summary>
 	private Dictionary<JsonString, JsonValue> data;
 
-	/// <summary> Separator character </summary>
-	private readonly string NAMEVALUEPAIR_SEPARATOR = ":";
 
 	public override JsonType JsonType { get { return JsonType.Object; } }
+	/// <summary> Number of Key/Value pairs in the JsonObject </summary>
 	public override int Count { get { return data.Count; } }
 	public override JsonValue this[JsonValue key] {
 		get {
@@ -907,6 +946,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return defaultValue;
 	}
 
+	/// <summary> Converts this JsonObject into a JsonArray, containing only the values in the object, in an arbitrary order. </summary>
+	/// <returns>JsonArray containing all JsonValues in this JsonObject</returns>
 	public JsonArray ToJsonArray() {
 		JsonArray arr = new JsonArray();
 		foreach (var pair in this) {
@@ -925,6 +966,7 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <summary> Returns the internal dictionary. </summary>
 	public Dictionary<JsonString, JsonValue> GetData() { return data; }
 
+	#region Dictionary Conversions
 	/// <summary> Gets a collection of all <string, bool> pairs </summary>
 	public Dictionary<string, bool> ToDictOfBool() {
 		Dictionary<string, bool> d = new Dictionary<string, bool>();
@@ -965,7 +1007,8 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		}
 		return d;
 	}
-
+	#endregion
+	
 	/// <summary> Removes the KeyValue pair associated with the given key </summary>
 	public JsonObject Remove(string key) {
 		if (ContainsKey(key)) { data.Remove(key); }
@@ -1062,7 +1105,9 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 	/// <param name="first">First JsonObject</param>
 	/// <param name="second">Second JsonObject</param>
 	/// <returns>A new JsonObject with the combined values of first and second (in order)</returns>
-	public static JsonObject Combine(JsonObject first, JsonObject second) { return new JsonObject().Set(first).Set(second); }
+	public static JsonObject Combine(JsonObject first, JsonObject second) { 
+		return new JsonObject().Set(first).Set(second);
+	}
 
 
 	/// <summary> Takes all of the pairs from a dictionary, 
@@ -1100,46 +1145,51 @@ public class JsonObject : JsonValueCollection, IEnumerable<KeyValuePair<JsonStri
 		return true;
 	}
 
+	
 
-	protected override string CollectionToPrettyPrint() {
-		JsonValue.CURRENT_INDENT++;
-		List<string> output = new List<string>();
-		List<string> nvps = new List<string>();
-		foreach (KeyValuePair<JsonString, JsonValue> kvp in data) {
-			string s = "".PadLeft(JsonValue.CURRENT_INDENT, Convert.ToChar(base.HORIZONTAL_TAB)) + kvp.Key.PrettyPrint() + NAMEVALUEPAIR_SEPARATOR;
-			if (kvp.Value != null) {
-				s += kvp.Value.PrettyPrint();
-			} else {//possible for collection to have an actual 'null' instead of JsonValue.NULL
-				s += "null";
+	/// <summary> Turns this JsonObject into a compact string. </summary>
+	/// <returns> String containing begin/end braces, All Key/Value pairs inside of the current JsonObject, without any excess whitespace. </returns>
+	public override string ToString() {
+		StringBuilder str = new StringBuilder();
+		str.Append("{");
+
+		int i = 0;
+		foreach (var pair in data) {
+			//str.Append('\"');
+			//str.Append(pair.Key.stringVal);
+			//str.Append('\"');
+			str.Append(pair.Key.ToString());
+			str.Append(':');
+			if (pair.Value == null) {//possible for collection to have an actual 'null' instead of JsonValue.NULL
+				str.Append("null");
+			} else  {
+				str.Append(pair.Value.ToString());
 			}
-			nvps.Add(s);
+			i++;
+			if (i < Count) { str.Append(','); }
 		}
-		output.Add(string.Join(base.JsonVALUE_SEPARATOR + Environment.NewLine, nvps.ToArray()));
-		JsonValue.CURRENT_INDENT--;
-		return string.Join("", output.ToArray());
+
+		str.Append("}");
+		return str.ToString();
 	}
 
-	protected override string CollectionToString() {
-		List<string> output = new List<string>();
-		List<string> nvps = new List<string>();
-		foreach (KeyValuePair<JsonString, JsonValue> kvp in data) {
-			string s = kvp.Key.ToString() + NAMEVALUEPAIR_SEPARATOR;
-			if (kvp.Value != null) {
-				s += kvp.Value.ToString();
-			} else {//possible for collection to have an actual 'null' instead of JsonValue.NULL
-				s += "null";
-			}
-			nvps.Add(s);
-		}
-		output.Add(string.Join(base.JsonVALUE_SEPARATOR, nvps.ToArray()));
-		return string.Join("", output.ToArray());
+	
+
+	/// <summary> Pretty prints the given JsonObject into a easily human-readable string. </summary>
+	/// <returns> PrettyPrinted string version of this object </returns>
+	public override string PrettyPrint() {
+		return new JsonPrettyPrinter().PrettyPrint(this).ToString();
 	}
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonArray
 
 /// <summary> Representation of an array of objects </summary>
-public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
+public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 
 	/// <summary>
 	/// Parses a standard CSV-format spreadsheet into a JsonArray.
@@ -1192,8 +1242,6 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 
-	protected override string BeginMarker { get { return "["; } }
-	protected override string EndMarker { get { return "]"; } }
 	/// <summary> Internal representation of data </summary>
 	protected List<JsonValue> list;
 	/// <summary> Get the internal representation of data </summary>
@@ -1493,48 +1541,158 @@ public class JsonArray : JsonValueCollection, IEnumerable<JsonValue> {
 		return arr;
 	}
 
-	protected override string CollectionToPrettyPrint() {
-		JsonValue.CURRENT_INDENT++;
-		List<string> output = new List<string>();
-		List<string> nvps = new List<string>();
-		foreach (JsonValue jv in list) {
-			string s = "null";
-			//possible for collection to have an actual 'null' instead of JsonValue.NULL
-			if (jv != null) { s = jv.PrettyPrint(); }
-			nvps.Add("".PadLeft(JsonValue.CURRENT_INDENT, Convert.ToChar(base.HORIZONTAL_TAB)) + s);
+	/// <summary> Prints out this JsonArray into a string with only one line. </summary>
+	/// <returns> String containing all of the ToString'd elements of the contents of this JsonArray. </returns>
+	public override string ToString() {
+		StringBuilder str = new StringBuilder();
+		str.Append('[');
+		int i = 0;
+		foreach (var item in this) {
+			if (item == null) {
+				str.Append("null");
+			} else {
+				str.Append(item.ToString());
+			}
+			i++;
+			if (i < Count) { str.Append(','); }
 		}
-		output.Add(string.Join(base.JsonVALUE_SEPARATOR + Environment.NewLine, nvps.ToArray()));
-		JsonValue.CURRENT_INDENT--;
-		return string.Join("", output.ToArray());
+
+		str.Append(']');
+		return str.ToString();
 	}
 
-	protected override string CollectionToString() {
-		List<string> output = new List<string>();
-		List<string> nvps = new List<string>();
-		foreach (JsonValue jv in list) {
-			string s = "null";
-			//possible for collection to have an actual 'null' instead of JsonValue.NULL
-			if (jv != null) { s = jv.ToString(); }
-			nvps.Add(s);
-		}
-		output.Add(string.Join(base.JsonVALUE_SEPARATOR, nvps.ToArray()));
-		return string.Join("", output.ToArray());
+	/// <summary> PrettyPrints the content of this JsonArray into an easily human readable string. </summary>
+	/// <returns> PrettyPrinted string containing the content of this JsonArray</returns>
+	public override string PrettyPrint() {
+		return new JsonPrettyPrinter().PrettyPrint(this).ToString();
 	}
-
-
 
 }
 
 #endregion
 
+#region PrettyPrinter
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonPrettyPrinter
+
+/// <summary> Provides thread-safe pretty printing </summary>
+public class JsonPrettyPrinter {
+
+	/// <summary> Current indent level </summary>
+	private int indentLevel = 0;
+	
+	/// <summary> PrettyPrints a given JsonObject. </summary>
+	/// <param name="obj">JsonObject to PrettyPrint</param>
+	/// <param name="str">StringBuilder to append to. If null, a new StringBuilder is created. This is also returned when the function ends.</param>
+	/// <returns>String builder holding pretty printed information</returns>
+	public StringBuilder PrettyPrint(JsonObject obj, StringBuilder str = null) {
+		if (str == null) { str = new StringBuilder(); }
+		string tabs = "".PadLeft(indentLevel, '\t');
+		
+		str.Append(tabs);
+		str.Append('{');
+		indentLevel++;
+
+		int i = 0;
+		foreach (var pair in obj) {
+			str.Append('\n');
+			str.Append(tabs);
+			str.Append('\t');
+
+			//str.Append('\"');
+			//str.Append(pair.Key.stringVal);
+			//str.Append('\"');
+			str.Append(pair.Key.PrettyPrint());
+			str.Append(':');
+			if (pair.Value != null) {
+				if (pair.Value.isObject) {
+					str.Append('\n');
+					this.PrettyPrint(pair.Value as JsonObject, str);
+				} else if (pair.Value.isArray) {
+					str.Append('\n');
+					this.PrettyPrint(pair.Value as JsonArray, str);
+				} else {
+					str.Append(pair.Value.PrettyPrint());
+				}
+			} else {//possible for collection to have an actual 'null' instead of JsonValue.NULL
+				str.Append("null");
+			}
+			i++;
+			if (i < obj.Count) { str.Append(','); }
+		}
+		indentLevel--;
+
+		str.Append('\n');
+		str.Append(tabs);
+		str.Append('}');
+
+		return str;
+	}
+
+	/// <summary> PrettyPrints a given JsonArray.</summary>
+	/// <param name="arr">JsonArray to PrettyPrint</param>
+	/// <param name="str">StringBuilder to append to. If null, a new StringBuilder is created. This is also returned when the function ends.</param>
+	/// <returns>String builder holding pretty printed information</returns>
+	public StringBuilder PrettyPrint(JsonArray arr, StringBuilder str = null) {
+		if (str == null) { str = new StringBuilder(); }
+		string tabs = "".PadLeft(indentLevel, '\t');
+
+		str.Append(tabs);
+		str.Append('[');
+		indentLevel++;
+
+		int i = 0;
+		foreach (var item in arr) {
+			str.Append('\n');
+
+			//Append item
+			if (item == null) {
+				str.Append(tabs);
+				str.Append('\t');
+				str.Append("null");
+			} else if (item.isObject) {
+				this.PrettyPrint(item as JsonObject, str);
+			} else if (item.isArray) {
+				this.PrettyPrint(item as JsonArray, str);
+			} else {
+				str.Append(tabs);
+				str.Append('\t');
+
+				str.Append(item.PrettyPrint());
+			}
+
+			i++;
+			if (i < arr.Count) { str.Append(','); }
+		}
+		indentLevel--;
+
+		str.Append('\n');
+		str.Append(tabs);
+		str.Append(']');
+
+		return str;
+	}
+}
+#endregion
+
 
 #region Reflector
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonReflector
 
 /// <summary> Class containing Reflection Code </summary>
 public class JsonReflector {
 
-	/// <summary> Grab method info for JsonArray.ToArrayOf() </summary>
+	/// <summary> Grab method info for JsonArray.ToArrayOf&lt;T&gt;() </summary>
 	static MethodInfo toArrayOf = typeof(JsonArray).GetMethod("ToArrayOf");
+	/// <summary> Grab method info for JsonArray.ToListOf&lt;T&gt;() </summary>
+	static MethodInfo toListOf = typeof(JsonArray).GetMethod("ToListOf");
+
 	/// <summary> Binding flags for easy usage </summary>
 	static BindingFlags publicMembers = BindingFlags.Instance | BindingFlags.Public;
 	/// <summary> Binding flags for easy usage </summary>
@@ -1579,13 +1737,31 @@ public class JsonReflector {
 			} catch {
 				sval = Enum.ToObject(destType, 0);
 			}
-		} else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } else if (val.isArray && destType.IsArray) {
+		} 
+		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } 
+		else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } 
+		else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } 
+		else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } 
+		else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } 
+		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } 
+		else if (val.isArray && destType.IsArray) {
 			//TBD: Reflect the JsonArray into a new array
 			JsonArray arr = val as JsonArray;
 			Type eleType = destType.GetElementType();
 			MethodInfo genericGrabber = toArrayOf.MakeGenericMethod(eleType);
 			sval = genericGrabber.Invoke(arr, new object[] { });
 
+		} else if (typeof(IList).IsAssignableFrom(destType)) {
+			JsonArray arr = val as JsonArray;
+			Type eleType;
+			if (JsonHelpers.TryListOfWhat(destType, out eleType)) {
+				MethodInfo genericGrabber = toListOf.MakeGenericMethod(eleType);
+				sval = genericGrabber.Invoke(arr, new object[] {});
+
+			} else {
+				sval = null;
+			}
+			
 		} else if (val.isObject) {
 			//TBD: Reflect the JsonObject into a new object of that type
 			JsonObject jobj = val as JsonObject;
@@ -1610,8 +1786,8 @@ public class JsonReflector {
 			sval = destType.GetNewInstance();
 			if (sval != null) { ReflectInto(jobj, sval); }
 
-
 		}
+
 
 		return sval;
 	}
@@ -1729,13 +1905,29 @@ public class JsonReflector {
 		JsonValue jval = null;
 
 		//Handle primitive types
-		if (type == typeof(string)) { return ((string)source); } else if (type == typeof(double)) { return ((double)source); } else if (type == typeof(int)) { return ((int)source); } else if (type == typeof(float)) { return ((float)source); } else if (type == typeof(byte)) { return ((byte)source); } else if (type == typeof(long)) { return ((long)source); } else if (type == typeof(short)) { return ((short)source); } else if (type == typeof(bool)) { return ((bool)source); } else if (type.IsArray) {
+		if (type == typeof(string)) { return ((string)source); } 
+		else if (type == typeof(double)) { return ((double)source); } 
+		else if (type == typeof(int)) { return ((int)source); } 
+		else if (type == typeof(float)) { return ((float)source); } 
+		else if (type == typeof(byte)) { return ((byte)source); } 
+		else if (type == typeof(long)) { return ((long)source); } 
+		else if (type == typeof(short)) { return ((short)source); }
+		else if (type == typeof(bool)) { return ((bool)source); } 
+		else if (type.IsArray) {
 			JsonArray arr = new JsonArray();
 			jval = arr;
 			Array obj = source as Array;
 			for (int i = 0; i < obj.Length; i++) {
 				//Reflect that element and add it into the json array
 				arr.Add(Reflect(obj.GetValue(i)));
+			}
+		} else if (typeof(IList).IsAssignableFrom(type)) {
+			JsonArray arr = new JsonArray();
+			jval = arr;
+			IList obj = (IList)source;
+			for (int i = 0; i < obj.Count; i++) {
+				//Reflect that element and add it into the json array
+				arr.Add(Reflect(obj[i]));
 			}
 		} else {
 			PropertyInfo keys = type.GetProperty("Keys");
@@ -1799,10 +1991,10 @@ public class JsonReflector {
 
 #if UNITY
 				if (type == typeof(Quaternion) && property.Name == "eulerAngles") { continue; }
-#if UNITY_5
+#if UNITY_5 || UNITY_6
 				//Why did they not mark this obsolete? Can't automatically detect it...
 				if (type == typeof(Rigidbody) && property.Name == "useConeFriction") { continue; }
-#endif // UNITY_5 
+#endif // UNITY_5 || UNITY_6
 #endif // UNITY
 
 				MethodInfo propGet = property.GetGetMethod();
@@ -1828,8 +2020,12 @@ public class JsonReflector {
 
 #endregion
 
-
 #region Deserializer
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonDeserializer
 
 /// <summary> Class holding logic for parsing Json text into JsonValues 
 /// A new instance of this class is created automatically by Json.Parse() </summary>
@@ -1945,6 +2141,7 @@ public class JsonDeserializer {
 		}
 		while (true) {
 			string key = ProcessKey();
+			key = key.JsonUnescapeString();
 			SkipWhitespace();
 			JsonValue val = ProcessValue();
 			obj.Add(key, val);
@@ -2015,6 +2212,11 @@ public class JsonDeserializer {
 #endregion
 
 #region Helpers
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonHelpers (helper class)
 
 /// <summary> Class containing some helper functions. </summary>
 public static class JsonHelpers {
@@ -2108,10 +2310,43 @@ public static class JsonHelpers {
 		return getter != null;
 	}
 
+
+	/// <summary> 
+	/// Test if a type implements IListT and determine the type of T. Taken from stack overflow 
+	/// https://stackoverflow.com/questions/1043755/c-sharp-generic-list-t-how-to-get-the-type-of-t/13608408#13608408
+	/// </summary>
+	/// <param name="type">Unknown Type to check</param>
+	/// <param name="innerType">Place to write back to once InnerType of the IList&lt;T&gt; is discovered</param>
+	/// <returns>True If the Unknown Type is an IList&lt;T&gt;, false otherwise</returns>
+	public static bool TryListOfWhat(Type type, out Type innerType) {
+		if (type == null) { innerType = null; return false; }
+		if (!typeof(IList).IsAssignableFrom(type)) { innerType = null; return false; }
+
+		var interfaceTest = new Func<Type, Type>(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IList<>) ? i.GetGenericArguments().Single() : null);
+		innerType = interfaceTest(type);
+		if (innerType != null) {
+			return true;
+		}
+
+		foreach (var i in type.GetInterfaces()) {
+			innerType = interfaceTest(i);
+			if (innerType != null) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 }
 #endregion
 
 #region Functional Operations
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonOperations (helper class)
 
 /// <summary> Class containing 'functional' operations 
 /// these operations process numeric information between multiple JsonObjects </summary>
