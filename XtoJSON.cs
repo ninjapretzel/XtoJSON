@@ -1,6 +1,6 @@
 /*	XtoJSON
 	Lightweight JSON Library for C#
-	Copyright (C) 2015  Jonathan Cohen
+	2015-2017  Jonathan Cohen
 	Contact: ninjapretzel@yahoo.com
 
     This program is free software: you can redistribute it and/or modify
@@ -65,7 +65,7 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 /// <summary> Quick access to Json parsing and reflection </summary>
 public static class Json {
 	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.7.1";
+	public const string VERSION = "0.8.0";
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
