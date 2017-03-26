@@ -12,23 +12,13 @@ using UnityEngine;
 public class Example : MonoBehaviour {
 	void Start() {
 		JsonExample.Main(null);
+
 	}
 }
 
 #endif
 
 public class JsonExample {
-
-	public static void Main(string[] args) {
-		JsonTests.RunTests();
-
-		//Check these functions out down below to see details on how this stuff works
-		//ReflectionExample_Foobar();
-		//ReflectionExample_NestedList();
-		//ObjectExample();
-		//StructExample();
-		
-	}
 
 	//Conditional stuff to support for examples in unity.
 #if UNITY_EDITOR
@@ -412,131 +402,3 @@ public class JsonExample {
 
 }
 
-
-public class JsonTests {
-	//Conditional stuff to support for examples in unity.
-	static bool PRINT_SUCCESS = false;
-
-#if UNITY_EDITOR
-	public static void Print(object o) { UnityEngine.Debug.Log(o.ToString()); }
-	public static void Print(string s) { UnityEngine.Debug.Log(s); }
-#elif UNITY_STANDALONE
-	public class Debug {
-		public static void Log(string s) { }
-		public static void Log(object o) { }
-	}
-	public static void Print(object o) {}
-	public static void Print(string s) {}
-#else
-	public static void Print(object o) { Console.WriteLine(o.ToString()); }
-	public static void Print(string s) { Console.WriteLine(s); }
-#endif
-
-	public static void RunTests() {
-		MethodInfo[] tests = typeof(JsonTests).GetMethods().Where(x => (x.Name.StartsWith("Test") && x.GetParameters().Count() == 0)).ToArray();
-		foreach (var test in tests) {
-			string str = "Running test: [" + test.Name + "]";
-			try {
-				test.Invoke(null, null);
-				str += "...Test Finished!";
-				Print(str);
-			} catch (Exception e) {
-				str += "...Test Failed!";
-				Print(str);
-				Print("Exception in test [" + test.Name + "] : (" + e + ")");
-			}
-
-		}
-	}
-
-	public static void AssertEqual(object val, object expected) {
-		if (!val.Equals(expected)) { Print("Assertion Failed, Unexpected value: (" + val + ") : expected : (" + expected + ")"); }
-		else if (PRINT_SUCCESS) { Print("Assertion Passed"); }
-	}
-
-	public static void TestEqualities() {
-		{
-			AssertEqual(JsonNull.instance, null);
-			AssertEqual(JsonNull.instance == null, true);
-		}
-
-		{
-			JsonNumber a = 5;
-			JsonNumber b = 5;
-			JsonNumber c = 10;
-			
-			AssertEqual(a, b);
-			AssertEqual(a, 5);
-			AssertEqual(a == c, false);
-			AssertEqual(c == 10, true);
-		}
-
-		{
-			JsonString a = "hullo";
-			JsonString b = "hullo";
-			JsonString c = "bob saget";
-
-			AssertEqual(a, b);
-			AssertEqual(a, "hullo");
-			AssertEqual(a == c, false);
-			AssertEqual(c == "bob saget", true);
-		}
-
-		{
-			JsonBool a = true;
-			JsonBool b = true;
-			JsonBool c = false;
-
-			AssertEqual(a, b);
-			AssertEqual(a, true);
-			AssertEqual(a == c, false);
-			AssertEqual(c == false, true);
-		}
-
-		{
-			JsonObject a = new JsonObject()
-				.Add("name", "bob saget")
-				.Add("paperTowels", 50)
-				.Add("hasBalls", true);
-				
-			JsonObject b = new JsonObject()
-				.Add("name", "bob saget")
-				.Add("paperTowels", 50)
-				.Add("hasBalls", true);
-
-			JsonObject c = new JsonObject()
-				.Add("name", "bobby bob bobberton")
-				.Add("paperTowels", "three hundred")
-				.Add("hasBalls", "yes");
-
-			AssertEqual(a, b);
-			AssertEqual(a == b, false);
-			AssertEqual(a.Equals(b), true);
-			AssertEqual(a == c, false);
-			AssertEqual(a.Equals(c), false);
-
-			a.Add("son", c);
-			b.Add("son", c);
-
-			AssertEqual(a, b);
-			AssertEqual(a == b, false);
-			AssertEqual(a.Equals(b), true);
-		}
-
-		{
-			JsonArray a = new JsonArray().Add("Heeeello").Add("nurse").Add(42);
-			JsonArray b = new JsonArray().Add("Heeeello").Add("nurse").Add(42);
-			JsonArray c = new JsonArray().Add("yes").Add("no").Add("maybe").Add("could you repeat the question?");
-			
-			AssertEqual(a, b);
-			AssertEqual(a == b, false);
-			AssertEqual(a.Equals(b), true);
-			AssertEqual(a == c, false);
-			AssertEqual(a.Equals(c), false);
-		}
-
-	}
-
-
-
-}
