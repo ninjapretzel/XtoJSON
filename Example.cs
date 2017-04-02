@@ -11,7 +11,7 @@ using UnityEngine;
 
 public class Example : MonoBehaviour {
 	void Start() {
-		JsonExample.Main(null);
+		JsonTests.RunTests();
 
 	}
 }
