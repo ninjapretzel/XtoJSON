@@ -1,21 +1,31 @@
+// Unity detection
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_6
+#define UNITY
+// Use UnityEngine's provided utilities.
+using UnityEngine;
+
+#else
+// Hook into some other useful diagnostic stuff
+using System.Runtime.CompilerServices;
+using System.Diagnostics;
+#endif
+
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Runtime.CompilerServices;
 using System.Text;
-using System.Threading.Tasks;
-
 /// <summary> Class containing a small suite of tests to ensure all functionality is good. </summary>
 public static class JsonTests {
 	// ~180 lines to get most of Shouldly's functionality.
 	#region shouldly-like-extensions
-	/// <summary> Generates a short informative string about the type and content of an object </summary>
-	/// <param name="obj"> Object to make info about </param>
-	/// <returns> Short string with info about the object </returns>
+/// <summary> Generates a short informative string about the type and content of an object </summary>
+/// <param name="obj"> Object to make info about </param>
+/// <returns> Short string with info about the object </returns>
+#if !UNITY
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+#endif
 	private static string Info(this object obj) {
 		if (obj == null) { obj = ActualNull.instance; }
 		return string.Format("({0})({1})", obj.GetType().Name, obj);
@@ -182,18 +192,28 @@ public static class JsonTests {
 		throw new AssertFailed("ShouldNotRun", "Line of code invokign this method should not have been reached.");
 	}
 
-	#endregion
+#endregion
 	
+	// Too many conditional compiles following...
+	// TBD: Find a better way to structure support for multiple platforms
 #if DEBUG
 	/// <summary> Output stream to write to, if assigned. </summary>
 	internal static TextWriter Out = null;
 #endif
-	/// <summary> Debug helper method </summary>
-	/// <param name="message"> Message object to output to the assigned outstream </param>
+/// <summary> Debug helper method </summary>
+/// <param name="message"> Message object to output to the assigned outstream </param>
+#if !UNITY // Note: Unity has control over this symbol, so this function shouldn't be marked Conditional in some cases when unity uses DEBUG
 	[Conditional("DEBUG")]
+#endif
 	public static void Log(object message) {
 #if DEBUG
-		if (Out != null) { Out.WriteLine(message); }
+		if (Out != null) {
+#if UNITY
+			Debug.Log(message);
+#else
+			Out.WriteLine(message); 
+#endif
+		}
 #endif
 	}
 	private static List<MethodInfo> GetTestMethods(this Type type) {
