@@ -31,28 +31,15 @@
 //		Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 // May have minor performance implications when enabled.
 
-// Unity detection
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_6
-#define UNITY
-// Use UnityEngine's provided utilities.
-using UnityEngine;
-
-#else
 // Hook into some other useful diagnostic stuff
-using System.Diagnostics;
-#endif
 using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Reflection;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Linq;
+using System.Text; // Needed when paired alongside ZSharp, since StringBuilder is wrapped (outside of namespace)
 
-#if DEBUG
-using System.IO;
-#endif
 #region Abstract/Primary stuff
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -68,12 +55,18 @@ public enum JsonType { String, Boolean, Number, Object, Array, Null }
 //////////////////////////////////////////////////////////////////////////////////////////////
 //Json
 
-/// <summary> Quick access to Json parsing and reflection </summary>
+/// <summary> Quick access to Json parsing and reflection, and other information  </summary>
 public static class Json {
-	
 
-	/// <summary> Current version of library </summary>
-	public const string VERSION = "0.8.1";
+	/// <summary> Major version number </summary>
+	public const int MAJOR = 0;
+	/// <summary> Minor version number </summary>
+	public const int MINOR = 9;
+	/// <summary> Sub-minor version Revision number </summary>
+	public const int REV = 0;
+
+	/// <summary> String representation of current version of library </summary>
+	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
 	public static JsonValue Parse(string json) {
@@ -1763,7 +1756,7 @@ public class JsonReflector {
 	static BindingFlags publicMember = BindingFlags.Instance | BindingFlags.Public;
 
 	/// <summary> Contains all blacklisted types (reflect to null by default) </summary>
-	static HashSet<Type> blacklist = new HashSet<Type>();
+	public static HashSet<Type> blacklist = new HashSet<Type>();
 	/// <summary> Blacklist a given type from being reflected </summary>
 	/// <param name="t">Type to blacklist</param>
 	public static void Blacklist(Type t) {
@@ -1776,14 +1769,21 @@ public class JsonReflector {
 		if (blacklist.Contains(t)) { blacklist.Remove(t); }
 	}
 
-#if UNITY
+	static readonly Type typeofPhysicMaterial = Type.GetType("UnityEngine.PhysicMaterial, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
+	static readonly Type typeofMaterial = Type.GetType("UnityEngine.Material, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
+	static readonly Type typeofQuaternion = Type.GetType("UnityEngine.Quaternion, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
+	static readonly Type typeofRigidBody = Type.GetType("UnityEngine.Rigidbody, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	public static bool loaded = Load();
 	static bool Load() {
-		Blacklist(typeof(PhysicMaterial));
-		Blacklist(typeof(Material));
+		// PhysicMaterials and Materials are resource objects, and many objects have automatic duplication in setters for these types.
+		// They are blacklisted to prevent materials from being silently duplicated and leaked, and also so that resource references are preserved in prefabs
+		// It is likely other similar types in UnityEngine should be blacklisted as well, but no problems have been noticed so far.
+		if (typeofPhysicMaterial != null) { Blacklist(typeofPhysicMaterial); }
+		if (typeofMaterial != null) { Blacklist(typeofMaterial); }
+
 		return true;
 	}
-#endif
+
 
 	/// <summary> Reflect a JsonValue based on a given type. Attempts to return an object, 
 	/// so return value may be null even if a value type is requested. </summary>
@@ -1820,18 +1820,19 @@ public class JsonReflector {
 			}
 
 		} else if (val.isObject) {
-			//TBD: Reflect the JsonObject into a new object of that type
+			//TBD: Reflect the JsonObject into a new object of that type???
 			JsonObject jobj = val as JsonObject;
 
 			if (destType.IsValueType) {
 				object boxedValue = Activator.CreateInstance(destType);
 				FieldInfo[] fields = destType.GetFields();
 
-#if UNITY
-				if (destType == typeof(Quaternion)) {
-					fields = fields.Where((field)=>(field.Name != "eulerAngles")).ToArray();
+				if (typeofQuaternion != null) {
+					// Remove 'eulerAngles' from Quaternions, as it is redundant information
+					// which is calculated from other information in the struct.
+					fields = fields.Where((field) => (field.Name != "eulerAngles")).ToArray();
 				}
-#endif
+
 				foreach (FieldInfo field in fields) {
 					object innerVal = GetReflectedValue(jobj[field.Name], field.FieldType);
 					if (innerVal != null) {
@@ -2038,13 +2039,11 @@ public class JsonReflector {
 					|| !property.IsReadable()
 					|| property.IsObsolete()) { continue; }
 
-#if UNITY
-				if (type == typeof(Quaternion) && property.Name == "eulerAngles") { continue; }
-#if UNITY_5 || UNITY_6
-				//Why did they not mark this obsolete? Can't automatically detect it...
-				if (type == typeof(Rigidbody) && property.Name == "useConeFriction") { continue; }
-#endif // UNITY_5 || UNITY_6
-#endif // UNITY
+				// Skip Quaternion.eulerAngles, as it's redundant information
+				// which is calculated from other information in the struct. 
+				if (type == typeofQuaternion && property.Name == "eulerAngles") { continue; }
+				// This property is deprecated as of UNITY_5. This prevents warnings when serializing rigidbodies.
+				if (type == typeofRigidBody && property.Name == "useConeFriction") { continue; }
 
 				MethodInfo propGet = property.GetGetMethod();
 
@@ -2306,14 +2305,14 @@ public static class JsonHelpers {
 	}
 
 	/// <summary> Array of numeric types </summary>
-	static Type[] numericTypes = new Type[] { 
-		typeof(double), 
-		typeof(int), 
-		typeof(float), 
+	static Type[] numericTypes = new Type[] {
+		typeof(double),
+		typeof(int),
+		typeof(float),
 		typeof(long),
-		typeof(decimal), 
+		typeof(decimal),
 		typeof(byte),
-		typeof(short), 
+		typeof(short),
 	};
 
 	/// <summary> is a type a numeric type? </summary>
