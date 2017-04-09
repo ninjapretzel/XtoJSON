@@ -16,6 +16,8 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+
+#if DEBUG
 /// <summary> Class containing a small suite of tests to ensure all functionality is good. </summary>
 public static class JsonTests {
 	// ~180 lines to get most of Shouldly's functionality.
@@ -1035,3 +1037,5 @@ public static class JsonTests {
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	
 }
+
+#endif

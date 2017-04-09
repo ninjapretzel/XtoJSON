@@ -5,6 +5,8 @@ using System.Collections.Generic;
 using System.Reflection;
 using System.Linq;
 
+#if DEBUG
+
 #if UNITY_EDITOR 
 //Example if you are running this inside of UNITY.
 using UnityEngine;
@@ -402,3 +404,4 @@ public class JsonExample {
 
 }
 
+#endif
