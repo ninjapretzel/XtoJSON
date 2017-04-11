@@ -985,7 +985,6 @@ public static class JsonTests {
 
 		{ // JsonBool
 			JsonBool a = true;
-			JsonBool b = true;
 			JsonBool c = false;
 
 			ShouldBeTrue(a);
