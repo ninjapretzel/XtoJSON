@@ -154,11 +154,7 @@ public static class Json {
 		if (t == typeof(string)) { return JsonType.String; }
 		if (t == typeof(bool)) { return JsonType.Boolean; }
 
-		if (t == typeof(int)
-			|| t == typeof(byte)
-			|| t == typeof(float)
-			|| t == typeof(double)
-			|| t == typeof(long)) { return JsonType.Number; }
+		if (t.IsNumeric()) { return JsonType.Number; }
 
 		return JsonType.Object;
 	}
@@ -1465,6 +1461,20 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 	/// <summary> Returns the internal list's Enumerator </summary>
 	public IEnumerator<JsonValue> GetEnumerator() { return list.GetEnumerator(); }
 
+	/// <summary> Get an object at a given <paramref name="index"/>, as a the given type <typeparamref name="T"/>. </summary>
+	/// <typeparam name="T"> Generic type parameter of object to get </typeparam>
+	/// <param name="index"> Index in this array to use </param>
+	/// <returns> Object at the given <paramref name="index"/>, interpreted as type <typeparamref name="T"/> </returns>
+	public T Get<T>(int index) { return Json.GetValue<T>(this[index]); }
+
+	public T Pull<T>(int index, T defaultValue = default(T)) {
+		if (index >= 0 && index < Count) {
+			JsonValue val = this[index];
+
+			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
+		}
+		return defaultValue;
+	}
 
 	/// <summary>
 	/// Searches through the array for an object with a key matching a string value
@@ -2392,7 +2402,7 @@ public static class JsonHelpers {
 	}
 
 	/// <summary> Array of numeric types </summary>
-	static Type[] numericTypes = new Type[] {
+	internal static Type[] numericTypes = new Type[] {
 		typeof(double),
 		typeof(int),
 		typeof(float),
