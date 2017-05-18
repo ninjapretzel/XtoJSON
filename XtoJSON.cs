@@ -76,7 +76,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 10;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 0;
+	public const int REV = 1;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
