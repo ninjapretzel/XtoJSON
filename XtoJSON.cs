@@ -264,15 +264,15 @@ public abstract class JsonValue {
 		}
 	}
 	/// <summary> Get the double value of this JsonValue </summary>
-	public virtual double numVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	public virtual double numVal { get { throw new InvalidOperationException("This JsonValue is not a number, it is a " + JsonType); } }
 	/// <summary> Get the float value of this JsonValue </summary>
-	public virtual float floatVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	public virtual float floatVal { get { throw new InvalidOperationException("This JsonValue is not a number, it is a " + JsonType); } }
 	/// <summary> Get the double value of this JsonValue </summary>
-	public virtual double doubleVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	public virtual double doubleVal { get { throw new InvalidOperationException("This JsonValue is not a number, it is a " + JsonType); } }
 	/// <summary> Get the integer value of this JsonValue </summary>
-	public virtual int intVal { get { throw new InvalidOperationException("This JsonValue is not a number"); } }
+	public virtual int intVal { get { throw new InvalidOperationException("This JsonValue is not a number, it is a " + JsonType); } }
 	/// <summary> Get the string value of this JsonValue </summary>
-	public virtual string stringVal { get { throw new InvalidOperationException("This JsonValue is not a string"); } }
+	public virtual string stringVal { get { throw new InvalidOperationException("This JsonValue is not a string, it is a " + JsonType); } }
 
 	/// <summary> Get the JsonType of this JsonValue. Fixed, based on the subclass. </summary>
 	public abstract JsonType JsonType { get; }
@@ -1049,12 +1049,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// If a T cannot be found, returns a default value. </summary>
 	[System.Obsolete("Renamed to 'Pull'")]
 	public T Extract<T>(string key, T defaultValue = default(T)) {
-		if (ContainsKey(key)) {
-			JsonValue val = this[key];
-
-			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
-		}
-		return defaultValue;
+		return Pull<T>(key, defaultValue);
 	}
 
 	/// <summary>Try to get a T from this object. 
@@ -1064,6 +1059,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
 
+			if (typeof(T) == val.GetType()) { return (T)(object)val; }
 			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
@@ -2415,6 +2411,14 @@ public static class JsonHelpers {
 	/// <summary> is a type a numeric type? </summary>
 	public static bool IsNumeric(this Type type) {
 		return numericTypes.Contains(type);
+	}
+
+	public static bool IsJsonType(this Type type) {
+		return type == typeof(JsonBool) || 
+			type == typeof(JsonNumber) ||
+			type == typeof(JsonString) ||
+			type == typeof(JsonObject) ||
+			type == typeof(JsonArray);
 	}
 
 	/// <summary> Get the numeric value of an object, as a double, regardless of the type that underpins it. </summary>
