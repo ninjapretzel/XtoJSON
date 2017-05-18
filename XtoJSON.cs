@@ -74,7 +74,7 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 0;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 9;
+	public const int MINOR = 10;
 	/// <summary> Sub-minor version Revision number </summary>
 	public const int REV = 0;
 
@@ -180,7 +180,7 @@ public static class Json {
 public abstract class JsonValue {
 
 	/// <summary> Base JsonNull null reference </summary>
-	public static readonly JsonValue NULL = JsonNull.instance;
+	public static JsonValue NULL { get { return JsonNull.instance; } }
 
 	/// <summary> Hidden constructor. </summary>
 	internal JsonValue() { }
@@ -373,10 +373,6 @@ public abstract class JsonValue {
 	/// If one is null, it checks against the JsonNull special value.
 	/// </summary>
 	public static bool operator ==(JsonValue a, object b) {
-		// Console.WriteLine("Entered JsonValue ==");
-		// Handle 'same object' comparisons early.
-		if (ReferenceEquals(a, b)) { return true; }
-
 		// Handle nulls before attempting to do anything else...
 		if (ReferenceEquals(a, null) || ReferenceEquals(a, JsonNull.instance)) {
 			//if a is null, they can only be equal if both are null...
@@ -385,6 +381,9 @@ public abstract class JsonValue {
 			//if a is not null, and b is null, then they cannot be equal...
 			return false;
 		}
+		
+		// Handle 'same object' comparisons early.
+		if (ReferenceEquals(a, b)) { return true; }
 
 		// Both things are not null at this point...
 		switch (a.JsonType) {
@@ -440,7 +439,7 @@ public abstract class JsonValue {
 	/// </summary>
 	public override bool Equals(object b) {
 		if (ReferenceEquals(this, b)) { return true; }
-		if (b == null && !ReferenceEquals(this, JsonNull.instance)) { return false; }
+		if (ReferenceEquals(b, null) && !ReferenceEquals(this, JsonNull.instance)) { return false; }
 
 		switch (JsonType) {
 			case JsonType.Number:
@@ -560,9 +559,10 @@ public abstract class JsonValueCollection : JsonValue {
 public class JsonNull : JsonValue {
 	/// <summary> internal representatino </summary>
 	public string _value { get { return "null"; } }
-	/// <summary> single instance of null </summary>
-	public static JsonNull instance = new JsonNull();
 
+	/// <summary> Reference to only instance of JsonNull </summary>
+	public static readonly JsonNull instance = new JsonNull();
+	
 	/// <summary> private constructor </summary>
 	private JsonNull() : base() { }
 
@@ -949,8 +949,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 
 	/// <summary> Initialize with an array of key,value pairs</summary>
 	/// <param name="pairs">Pairs of values to use. Must be even in length, and contain 'JsonString,JsonValue' pairs</param>
-	public JsonObject(params JsonValue[] pairs)
-		: this() {
+	public JsonObject(params JsonValue[] pairs) : this() {
 
 		if (pairs.Length % 2 == 0) {
 			for (int i = 0; i < pairs.Length; i += 2) {
