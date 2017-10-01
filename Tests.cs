@@ -1,11 +1,18 @@
 // Unity detection
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_6
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017
 #define UNITY
+#if UNITY_2017
+#define COMP_SERVICES
+using System.Runtime.CompilerServices;
+
+#endif
 // Use UnityEngine's provided utilities.
 using UnityEngine;
 
+
 #else
 // Hook into some other useful diagnostic stuff
+#define COMP_SERVICES
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
 #endif
@@ -17,15 +24,37 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 
+#if UNITY
+namespace JsonTests_ {
+
+	[ExecuteInEditMode] public class Tests : MonoBehaviour {
+		
+		#if UNITY_EDITOR
+		public string JsonTestObject = "Last Updated 1.1.0";
+		public bool go = false;
+		public void Update() {
+			if (go) {
+				go = false;
+				Debug.Log(JsonTests.RunTests());
+			}
+		}
+		#endif
+
+	}
+
+}
+#endif
+
 #if DEBUG
 /// <summary> Class containing a small suite of tests to ensure all functionality is good. </summary>
 public static class JsonTests {
+	#region Test Framework
 	// ~180 lines to get most of Shouldly's functionality.
 	#region shouldly-like-extensions
-/// <summary> Generates a short informative string about the type and content of an object </summary>
-/// <param name="obj"> Object to make info about </param>
-/// <returns> Short string with info about the object </returns>
-#if !UNITY
+	/// <summary> Generates a short informative string about the type and content of an object </summary>
+	/// <param name="obj"> Object to make info about </param>
+	/// <returns> Short string with info about the object </returns>
+#if COMP_SERVICES
 	[MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
 	private static string Info(this object obj) {
@@ -196,6 +225,7 @@ public static class JsonTests {
 
 #endregion
 	
+	
 	// Too many conditional compiles following...
 	// TBD: Find a better way to structure support for multiple platforms
 #if DEBUG
@@ -210,11 +240,7 @@ public static class JsonTests {
 	public static void Log(object message) {
 #if DEBUG
 		if (Out != null) {
-#if UNITY
-			Debug.Log(message);
-#else
 			Out.WriteLine(message); 
-#endif
 		}
 #endif
 	}
@@ -249,7 +275,7 @@ public static class JsonTests {
 			description = desc;
 		}
 	}
-
+	#endregion
 
 	/// <summary> Runs all of the tests, and returns a string containing information about tests passing/failing. </summary>
 	/// <returns> A log of information about the results of the tests. </returns>
@@ -282,7 +308,8 @@ public static class JsonTests {
 						Log("\tFailure, Exception Generated: " + ex.GetType().Name);
 
 					}
-					Log("\tLocation: " + ex.StackTrace.CallInfo());
+					Log("\tLocation: " + ex.StackTrace);
+					Log("\tInner: " + ex.InnerException);
 					
 				}
 			} catch (Exception e) {
@@ -431,7 +458,7 @@ public static class JsonTests {
 				b["son"].ShouldNotBe(c);
 				b["son"].ShouldEqual(c);
 			}
-			5.ShouldBe(12);
+			
 		}
 		public static void TestObjectIndex() {
 			{

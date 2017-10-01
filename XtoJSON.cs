@@ -31,6 +31,11 @@
 //		Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 // May have minor performance implications when enabled.
 
+// #define XtoJSON_ConcurrentObjects
+//		Enabled - JsonObjects internally use ConcurrentDictionary<,> to hold Key/Value pairs.
+//		Disabled - JsonObjects internally use Dictionary<,> to hold Key/Value pairs.
+//	
+
 // Hook into some other useful diagnostic stuff
 using System;
 using System.Collections;
@@ -39,6 +44,10 @@ using System.Globalization;
 using System.Reflection;
 using System.Linq;
 using System.Text; // Needed when paired alongside ZSharp, since StringBuilder is wrapped (outside of namespace)
+
+#if XtoJSON_ConcurrentObjects
+using System.Collections.Concurrent;
+#endif
 
 #region Abstract/Primary stuff
 
@@ -72,11 +81,11 @@ public enum JsonType {
 public static class Json {
 
 	/// <summary> Major version number </summary>
-	public const int MAJOR = 0;
+	public const int MAJOR = 1;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 10;
+	public const int MINOR = 1;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 1;
+	public const int REV = 0;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -85,6 +94,12 @@ public static class Json {
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		return jds.Deserialize();
+	}
+
+	public static T Parse<T>(string json) where T : JsonValue {
+		JsonDeserializer jds = new JsonDeserializer(json);
+		JsonValue val = jds.Deserialize();
+		return (val is T) ? ((T)val) : null;
 	}
 
 	/// <summary> Trys to parse a json string into a JsonValue representation. 
@@ -159,15 +174,6 @@ public static class Json {
 		return JsonType.Object;
 	}
 
-	/// <summary> More formal name for Parse() </summary>
-	public static JsonValue ParseJson(this string json) { return Parse(json); }
-	/// <summary> More formal name for Parse() </summary>
-	public static JsonValue DeserializeJson(this string json) { return Parse(json); }
-
-	/// <summary> More formal name for Reflect() </summary>
-	public static JsonValue ReflectJson(this object obj) { return Reflect(obj); }
-	/// <summary> More formal name for Reflect() </summary>
-	public static JsonValue SerializeJson(this object obj) { return Reflect(obj); }
 
 }
 
@@ -435,7 +441,7 @@ public abstract class JsonValue {
 	/// <summary>
 	/// Equality Comparison from any JsonValue type to any object
 	/// This is more in depth than a plain '==' comparison, which defaults to references
-	/// This checks all keys within the method
+	/// Recursively checks for equality on arrays/objects.
 	/// </summary>
 	public override bool Equals(object b) {
 		if (ReferenceEquals(this, b)) { return true; }
@@ -460,12 +466,16 @@ public abstract class JsonValue {
 			case JsonType.Object:
 				if (b is JsonObject) {
 					JsonObject obj = b as JsonObject;
+					// Apparantly the ConcurrentDictionary.Count property can be obnoxiously slow
+					// so we avoid comparing counts twice on Concurrent Objects.
+					#if !XtoJSON_ConcurrentObjects
 					if (Count != obj.Count) { return false; }
+					#endif
 					int i = 0;
 					foreach (var pair in obj) {
 						string key = pair.Key.stringVal;
 						JsonValue val = pair.Value;
-						if (!this.ContainsKey(key)) { return false; }
+						if (!ContainsKey(key)) { return false; }
 						if (!val.Equals(this[key])) { return false; }
 						i++;
 					}
@@ -487,7 +497,7 @@ public abstract class JsonValue {
 	/// <returns> Deep copy of this object. </returns>
 	public virtual JsonValue DeepCopy() {
 		// Create a deep copy of every 
-		if (this.isObject) {
+		if (isObject) {
 			JsonObject copy = new JsonObject();
 			foreach (var pair in this as JsonObject) {
 				var key = pair.Key;
@@ -497,7 +507,7 @@ public abstract class JsonValue {
 			}
 			return copy;
 		}
-		if (this.isArray) {
+		if (isArray) {
 			JsonArray copy = new JsonArray();
 			foreach (var val in this as JsonArray) {
 				var v = val;
@@ -864,8 +874,11 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	}
 
 	/// <summary> Internal representation of information. </summary>
-	private Dictionary<JsonString, JsonValue> data;
-
+	#if XtoJSON_ConcurrentObjects
+		private ConcurrentDictionary<JsonString, JsonValue> data;
+	#else
+		private Dictionary<JsonString, JsonValue> data;
+	#endif
 	/// <inheritdoc />
 	public override JsonType JsonType { get { return JsonType.Object; } }
 	/// <summary> Number of Key/Value pairs in the JsonObject </summary>
@@ -890,11 +903,21 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 
 		set {
 			if (key.isString) {
+				#if XtoJSON_ConcurrentObjects
+				JsonValue rem;
+				if (value == null && data.ContainsKey((JsonString)key)) { data.TryRemove((JsonString)key, out rem); }
+				#else
 				if (value == null && data.ContainsKey((JsonString)key)) { data.Remove((JsonString)key); }
+				#endif
 				if (value != null) { data[(JsonString)key] = value; }
 			} else if (key.isBool || key.isNumber) {
 				string k = key.stringVal;
+				#if XtoJSON_ConcurrentObjects
+				JsonValue rem;
+				if (value == null && data.ContainsKey(k)) { data.TryRemove(k, out rem);}
+				#else
 				if (value == null && data.ContainsKey(k)) { data.Remove(k); }
+				#endif
 				if (value != null) { data[k] = value; }
 			} else {
 				throw new Exception(key.JsonType.ToString() + " is not a valid key for " + JsonType.ToString());
@@ -941,12 +964,19 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public bool HasAny(IEnumerable<string> keys) { return this.ContainsAnyKeys(keys.ToArray()); }
 
 	/// <summary> Default Constructor, creates an empty collection. </summary>
+	#if XtoJSON_ConcurrentObjects
+	public JsonObject() : base() { data = new ConcurrentDictionary<JsonString, JsonValue>(); }
+	#else
 	public JsonObject() : base() { data = new Dictionary<JsonString, JsonValue>(); }
+	#endif
 	/// <summary> Copy infomration from another JsonObject. This is a shallow copy. </summary>
 	public JsonObject(JsonObject src) : this() { Add(src); }
 	/// <summary> Create an JsonObject, setting its data to the parameter. </summary>
+	#if XtoJSON_ConcurrentObjects
+	public JsonObject(ConcurrentDictionary<JsonString, JsonValue> src) : base() { data = src; }
+	#else
 	public JsonObject(Dictionary<JsonString, JsonValue> src) : base() { data = src; }
-
+	#endif
 	/// <summary> Initialize with an array of key,value pairs</summary>
 	/// <param name="pairs">Pairs of values to use. Must be even in length, and contain 'JsonString,JsonValue' pairs</param>
 	public JsonObject(params JsonValue[] pairs) : this() {
@@ -957,7 +987,11 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 				JsonValue val = pairs[i + 1];
 				if (val == null || val == JsonNull.instance) { continue; }
 
+				#if XtoJSON_ConcurrentObjects
+				data[key] = val;
+				#else
 				data.Add(key, val);
+				#endif
 			}
 
 		} else {
@@ -976,7 +1010,11 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		if (value == JsonNull.instance) { return this; }
 
 		if (!data.ContainsKey(name)) {
+			#if XtoJSON_ConcurrentObjects
+			data[name] = value;
+			#else
 			data.Add(name, value);
+			#endif
 		}
 
 		return this;
@@ -1085,8 +1123,11 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public IEnumerator<KeyValuePair<JsonString, JsonValue>> Pairs { get { return data.GetEnumerator(); } }
 
 	/// <summary> Returns the internal dictionary. </summary>
+	#if XtoJSON_ConcurrentObjects
+	public ConcurrentDictionary<JsonString, JsonValue> GetData() { return data; }
+	#else
 	public Dictionary<JsonString, JsonValue> GetData() { return data; }
-
+	#endif
 	#region Dictionary Conversions
 	/// <summary> Gets a collection of all &lt;string, bool&gt; pairs </summary>
 	public Dictionary<string, bool> ToDictOfBool() {
@@ -1131,8 +1172,20 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	#endregion
 
 	/// <summary> Removes the KeyValue pair associated with the given key </summary>
+	#if XtoJSON_ConcurrentObjects
+	public JsonObject Remove(string key, out JsonValue rem) {
+		data.TryRemove(key, out rem);
+		return this; 
+	}
+	/// <summary> Removes the KeyValue pair associated with the given key </summary>
+	public JsonObject Remove(string key) {
+		JsonValue rem;
+		data.TryRemove(key, out rem);
+	#else
+	/// <summary> Removes the KeyValue pair associated with the given key </summary>
 	public JsonObject Remove(string key) {
 		if (ContainsKey(key)) { data.Remove(key); }
+	#endif
 		return this;
 	}
 
@@ -2729,4 +2782,38 @@ public static class JsonOperations {
 
 #endregion
 
+
+#region Extensions
+namespace XtoJSON {
+
+	/// <summary> Holds extensions for types outside of the JsonValue derived types </summary>
+	public static class Extensions {
+
+		/// <summary> Extension on object to copy arbitrary fields into it from another object. </summary>
+		/// <typeparam name="T"> Generic Type </typeparam>
+		/// <param name="target"> Target to recieve data </param>
+		/// <param name="data"> Object providing the data </param>
+		public static void ApplyValues<T>(this object target, T data) {
+			JsonObject dataObj = Json.Reflect(data) as JsonObject;
+			if (dataObj != null) {
+				Json.ReflectInto(dataObj, target);
+			}
+
+		}
+
+		/// <summary> More formal name for Parse() </summary>
+		public static JsonValue ParseJson(this string json) { return Json.Parse(json); }
+		/// <summary> More formal name for Parse() </summary>
+		public static JsonValue DeserializeJson(this string json) { return Json.Parse(json); }
+
+		/// <summary> More formal name for Reflect() </summary>
+		public static JsonValue ReflectJson(this object obj) { return Json.Reflect(obj); }
+		/// <summary> More formal name for Reflect() </summary>
+		public static JsonValue SerializeJson(this object obj) { return Json.Reflect(obj); }
+	}
+
+}
+
+
+#endregion
 
