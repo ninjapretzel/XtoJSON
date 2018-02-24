@@ -30,8 +30,15 @@
 //		Enabled - numbers are stored internally as a string value, and are converted to and from number types
 //		Disabled - numbers are stored internally as a double value, and are parsed from a string when converted from anything other than a double
 // May have minor performance implications when enabled.
+//		Alternatively, if you want to use floats instead of doubles:
+// #define XtoJSON_FloatNumbers
+//		Enabled - numbers are stored internally as a float value.
+// 
 
-// #define XtoJSON_ConcurrentObjects
+// #define XtoJSON_ConcurrentObjects - Deprecated.
+//		Has no effect as of 2.0.0
+//		ConcurrentDictionary can be used as an internal data storage with by providing an IDictionary<JsonString, JsonValue> generating function to JsonObject.DictionaryGenerator
+// Previously:
 //		Enabled - JsonObjects internally use ConcurrentDictionary<,> to hold Key/Value pairs.
 //		Disabled - JsonObjects internally use Dictionary<,> to hold Key/Value pairs.
 //	
@@ -44,10 +51,6 @@ using System.Globalization;
 using System.Reflection;
 using System.Linq;
 using System.Text; // Needed when paired alongside ZSharp, since StringBuilder is wrapped (outside of namespace)
-
-#if XtoJSON_ConcurrentObjects
-using System.Collections.Concurrent;
-#endif
 
 #region Abstract/Primary stuff
 
@@ -69,7 +72,9 @@ public enum JsonType {
 	/// <summary> Represents an array of arbitrary values </summary>
 	Array,
 	/// <summary> Represents a missing value </summary>
-	Null
+	Null,
+	/// <summary> Represents a function value </summary>
+	Function,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -81,9 +86,9 @@ public enum JsonType {
 public static class Json {
 
 	/// <summary> Major version number </summary>
-	public const int MAJOR = 1;
+	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 1;
+	public const int MINOR = 0;
 	/// <summary> Sub-minor version Revision number </summary>
 	public const int REV = 0;
 
@@ -96,10 +101,24 @@ public static class Json {
 		return jds.Deserialize();
 	}
 
+	/// <summary> Parses a JSON formatted string directly into a JsonValue derivitive type. </summary>
+	/// <typeparam name="T"> Expected result type. </typeparam>
+	/// <param name="json"> JSON formatted string to parse </param>
+	/// <returns> Object of type T, or null. </returns>
 	public static T Parse<T>(string json) where T : JsonValue {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		JsonValue val = jds.Deserialize();
 		return (val is T) ? ((T)val) : null;
+	}
+
+	/// <summary> Parses a string, directly into an arbitrary type. Hurr, get it? Json.To&lt;X&gt;</summary>
+	/// <typeparam name="X"> Expected result type. </typeparam>
+	/// <param name="json"> JSON formatted string to parse </param>
+	/// <returns> Object of type T, from data in <paramref name="json"/> </returns>
+	public static X To<X>(string json) {
+		JsonDeserializer jds = new JsonDeserializer(json);
+		JsonValue val = jds.Deserialize();
+		return GetValue<X>(val);
 	}
 
 	/// <summary> Trys to parse a json string into a JsonValue representation. 
@@ -165,11 +184,12 @@ public static class Json {
 	public static JsonType ReflectedType(object o) {
 		if (o == null) { return JsonType.Null; }
 		Type t = o.GetType();
-		if (t.IsArray) { return JsonType.Array; }
 		if (t == typeof(string)) { return JsonType.String; }
 		if (t == typeof(bool)) { return JsonType.Boolean; }
-
 		if (t.IsNumeric()) { return JsonType.Number; }
+
+
+		if (t.IsArray) { return JsonType.Array; }
 
 		return JsonType.Object;
 	}
@@ -211,6 +231,8 @@ public abstract class JsonValue {
 	public bool isArray { get { return JsonType == JsonType.Array; } }
 	/// <summary> Is this a null? </summary>
 	public bool isNull { get { return JsonType == JsonType.Null; } }
+	/// <summary> Is this a function? </summary>
+	public bool isFunction { get { return JsonType == JsonType.Function; } }
 
 	/// <summary> How many items are in this JsonValue, given it is a collection? </summary>
 	public virtual int Count { get { throw new InvalidOperationException("This JsonValue is not a collection"); } }
@@ -263,10 +285,21 @@ public abstract class JsonValue {
 	/// <summary> Get the boolean value of this JsonValue </summary>
 	public virtual bool boolVal {
 		get {
-			if (isArray || isObject || (isString && stringVal.Length > 0) || (isNumber && numVal != 0)) {
-				return true;
+			switch (JsonType) {
+				case JsonType.Array:
+				case JsonType.Object:
+				case JsonType.Function:
+					return true;
+				case JsonType.String:
+					return stringVal.Length > 0;
+				case JsonType.Number:
+					double val = numVal;
+					return val != 0 && !double.IsNaN(val);
+				case JsonType.Null:
+				default:
+					return false;
+
 			}
-			return false;
 		}
 	}
 	/// <summary> Get the double value of this JsonValue </summary>
@@ -399,7 +432,8 @@ public abstract class JsonValue {
 				double aVal = a.doubleVal;
 				double bVal = double.NaN;
 				if (b.GetType().IsNumeric()) { bVal = JsonHelpers.GetNumericValue(b); }
-				if (b is JsonNumber) { bVal = (b as JsonNumber).doubleVal; }
+				else if (b is JsonNumber) { bVal = (b as JsonNumber).doubleVal; }
+				else { return false; }
 
 				// If both are the same NaN/+Inf/-Inf, they are equal.
 				if (double.IsNaN(aVal) && double.IsNaN(bVal)) { return true; }
@@ -409,6 +443,8 @@ public abstract class JsonValue {
 				if (double.IsInfinity(aVal) || double.IsInfinity(bVal) || double.IsNaN(aVal) || double.IsNaN(bVal)) {
 					return false;
 				}
+
+				if (aVal == bVal) { return true; }
 
 				double s = aVal + bVal;
 				double d = aVal - bVal;
@@ -429,10 +465,11 @@ public abstract class JsonValue {
 
 				return false;
 
+			case JsonType.Function:
 			case JsonType.Object:
 			case JsonType.Array:
 			default:
-				// Objects and Arrays with different addresses are not considered equal by '=='
+				// functions Objects and Arrays with different addresses are not considered equal by '=='
 				return false;
 		}
 
@@ -466,11 +503,11 @@ public abstract class JsonValue {
 			case JsonType.Object:
 				if (b is JsonObject) {
 					JsonObject obj = b as JsonObject;
+					
 					// Apparantly the ConcurrentDictionary.Count property can be obnoxiously slow
-					// so we avoid comparing counts twice on Concurrent Objects.
-					#if !XtoJSON_ConcurrentObjects
+					// so we should avoid comparing counts on Concurrent Objects.
 					if (Count != obj.Count) { return false; }
-					#endif
+					
 					int i = 0;
 					foreach (var pair in obj) {
 						string key = pair.Key.stringVal;
@@ -482,6 +519,8 @@ public abstract class JsonValue {
 					return true;
 				}
 				return false;
+			case JsonType.Function:
+				return (ReferenceEquals(this, b)); // Functions are equal by reference only 
 			default: // Default - a is JsonNull.instance
 				return (b == null || ReferenceEquals(b, JsonNull.instance));
 		}
@@ -520,6 +559,75 @@ public abstract class JsonValue {
 		// Non-objects and non-arrays are immutable, and trivially deepcopied.
 		return this;
 	}
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonFunction
+/// <summary> Represents a function in the context of a JsonObject, with parameters contained in a JsonArray. </summary>
+public class JsonFunction : JsonValue {
+
+	/// <summary> Empty Function that does nothing and returns null. </summary>
+	public static readonly Func<JsonObject, JsonArray, JsonValue> EMPTY_FUNCTION = (context, prams) => JsonNull.instance;
+
+	/// <summary> Function reference. Parameters are (context, params), returns a JsonValue </summary>
+	private Func<JsonObject, JsonArray, JsonValue> func;
+
+	/// <summary> A context object that has been bound to this function, if any. </summary>
+	private JsonObject boundContext = null;
+
+	/// <summary> Default constructor that wraps <see cref="EMPTY_FUNCTION"/> </summary>
+	public JsonFunction() { func = EMPTY_FUNCTION; }
+	
+	/// <summary> Constructor that wraps a function just returning a JsonValue. </summary>
+	/// <param name="func"> Function to wrap that takes no context/parameters and returns a JsonValue. </param>
+	public JsonFunction(Func<JsonValue> func) { this.func = (context, prams) => { return func(); }; }
+
+	/// <summary> Constructor that wraps a function taking a JsonObject and returning a JsonValue. </summary>
+	/// <param name="func"> Function that takes a JsonObject context, but no parameters, and returns a JsonValue. </param>
+	public JsonFunction(Func<JsonObject, JsonValue> func) { this.func = (context, prams)=> { return func(context); }; }
+
+	/// <summary> Constructor that wraps a function taking a JsonObject and JsonArray, and returning a JsonValue. </summary>
+	/// <param name="func"> Function that takes a JsonObject context, and JsonArray parameters, and returns a JsonValue. </param>
+	public JsonFunction(Func<JsonObject, JsonArray, JsonValue> func) { this.func = (context, prams) => { return func(context, prams); }; }
+
+	/// <summary> Invokes the wrapped function with the given <paramref name="context"/> and <paramref name="prams"/>. </summary>
+	/// <param name="context"> JsonObject holding the context of the invocation, if one has not been bound. </param>
+	/// <param name="prams"> Parameters passed into the function </param>
+	/// <returns> JsonValue generated by the function call </returns>
+	public JsonValue Invoke(JsonObject context, JsonArray prams) {
+		return func(boundContext ?? context, prams); 
+	}
+
+	/// <summary> Creates a copy of this function, bound to a given context </summary>
+	/// <param name="context"> Context object to bind the function to </param>
+	/// <returns> Copy of this JsonFunction, bound to a given context object. </returns>
+	public JsonFunction Bind(JsonObject context) {
+		JsonFunction copy = new JsonFunction();
+		copy.func = func;
+		copy.boundContext = context;
+		return copy;
+	}
+
+	/// <summary> Pretty sure this is yagni, but creates a copy of this function, bound to no context. </summary>
+	/// <returns> Copy of this JsonFunction, with no bound context object. </returns>
+	public JsonFunction Unbind() {
+		JsonFunction copy = new JsonFunction();
+		copy.func = func;
+		copy.boundContext = null;
+		return copy;
+	}
+	
+
+	/// <inheritdoc />
+	public override JsonType JsonType { get { return JsonType.Function; } }
+
+	/// <inheritdoc />
+	public override string PrettyPrint() { return "func()=>{}"; }
+
+	/// <inheritdoc />
+	public override string ToString() { return "func()=>{}"; }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -584,8 +692,7 @@ public class JsonNull : JsonValue {
 	public override float floatVal { get { return 0; } }
 	/// <inheritdoc />
 	public override int intVal { get { return 0; } }
-	/// <inheritdoc />
-	public override bool boolVal { get { return false; } }
+
 	/// <inheritdoc />
 	public override string stringVal { get { return "null"; } }
 	/// <inheritdoc />
@@ -605,7 +712,7 @@ public class JsonNull : JsonValue {
 /// <summary> bool type represented as a JsonValue. </summary>
 public class JsonBool : JsonValue {
 	/// <summary> internal representation </summary>
-	private string _value;
+	private bool _value;
 
 	/// <summary> 'true' instance </summary>
 	public static JsonBool TRUE = new JsonBool(true);
@@ -613,17 +720,17 @@ public class JsonBool : JsonValue {
 	public static JsonBool FALSE = new JsonBool(false);
 
 	/// <inheritdoc />
-	public override string stringVal { get { return _value; } }
+	public override string stringVal { get { return _value ? "true" : "false"; } }
 	/// <inheritdoc />
-	public override int intVal { get { return _value == "true" ? 1 : 0; } }
+	public override int intVal { get { return _value ? 1 : 0; } }
 	/// <inheritdoc />
-	public override double numVal { get { return _value == "true" ? 1 : 0; } }
+	public override double numVal { get { return _value ? 1 : 0; } }
 	/// <inheritdoc />
-	public override float floatVal { get { return _value == "true" ? 1 : 0; } }
+	public override float floatVal { get { return _value ? 1 : 0; } }
 	/// <inheritdoc />
-	public override double doubleVal { get { return _value == "true" ? 1 : 0; } }
+	public override double doubleVal { get { return _value ? 1 : 0; } }
 	/// <inheritdoc />
-	public override bool boolVal { get { return _value == "true"; } }
+	public override bool boolVal { get { return _value; } }
 	/// <inheritdoc />
 	public override JsonType JsonType { get { return JsonType.Boolean; } }
 
@@ -633,12 +740,12 @@ public class JsonBool : JsonValue {
 	public static JsonBool Get(bool val) { return val ? TRUE : FALSE; }
 
 	/// <summary> Private constructor </summary>
-	private JsonBool(bool value) : base() { _value = value ? "true" : "false"; }
+	private JsonBool(bool value) : base() { _value = value; }
 	
 	/// <inheritdoc />
-	public override string ToString() { return _value; }
+	public override string ToString() { return stringVal; }
 	/// <inheritdoc />
-	public override string PrettyPrint() { return _value; }
+	public override string PrettyPrint() { return stringVal; }
 
 }
 
@@ -694,12 +801,43 @@ public class JsonNumber : JsonValue {
 	/// <inheritdoc />
 	public override string PrettyPrint() { return ""+_value; }
 
+#elif X_TO_JSON_FloatNumbers
+	
+	/// <summary> Internal representation </summary>
+	private float _value;
+
+	/// <inheritdoc />
+	public override string stringVal { get { return _value.ToString("###0.#"); } }
+	/// <inheritdoc />
+	public override double numVal { get { return _value; } }
+	/// <inheritdoc />
+	public override double doubleVal { get { return _value; } }
+	/// <inheritdoc />
+	public override float floatVal { get { return _value; } }
+	/// <inheritdoc />
+	public override int intVal { get { return (int)_value; } }
+
+	/// <summary> float constructor </summary>
+	public JsonNumber(float value) { _value = value; }
+
+	/// <summary> Internal hidden constructor </summary>
+	internal JsonNumber(double value) : base() { _value = (float)value; }
+	/// <summary> int constructor </summary>
+	public JsonNumber(int value) : this(float.Parse("" + value)) { }
+	/// <summary> decimal constructor </summary>
+	public JsonNumber(decimal value) : this(float.Parse("" + value)) { }
+	/// <summary> byte constructor </summary>
+	public JsonNumber(byte value) : this(float.Parse("" + value)) { }
+
+	/// <inheritdoc />
+	public override string ToString() { return _value.ToString(formatter); }
+	/// <inheritdoc />
+	public override string PrettyPrint() { return _value.ToString(formatter); }
+
 #else
 	/// <summary> Internal representation </summary>
 	private double _value;
 
-	/// <inheritdoc />
-	public override bool boolVal { get { return _value != 0 && !double.IsNaN(_value); } }
 	/// <inheritdoc />
 	public override string stringVal { get { return _value.ToString("###0.#"); } }
 	/// <inheritdoc />
@@ -764,9 +902,7 @@ public class JsonString : JsonValue {
 			return double.NaN;
 		}
 	}
-
-	/// <inheritdoc />
-	public override bool boolVal { get { return _value.Length > 0; } }
+	
 	/// <inheritdoc />
 	public override double doubleVal { get { return numVal; } }
 	/// <inheritdoc />
@@ -872,17 +1008,33 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 
 		return ret;
 	}
+	
+	/// <summary> Default method for generating a Dictionary used to store data. </summary>
+	private static Dictionary<JsonString, JsonValue> DefaultGenerator() { return new Dictionary<JsonString, JsonValue>(); }
+
+	/// <summary> Private reference to the </summary>
+	private static Func<IDictionary<JsonString, JsonValue>> _DictionaryGenerator = null;
+	/// <summary> The current storage Dictionary generator that is being used. </summary>
+	public static Func<IDictionary<JsonString, JsonValue>> DictionaryGenerator {
+		get {
+			if (_DictionaryGenerator == null) { return DefaultGenerator; }
+			return _DictionaryGenerator;
+		}
+		set { _DictionaryGenerator = value; }
+	}
+
 
 	/// <summary> Internal representation of information. </summary>
-	#if XtoJSON_ConcurrentObjects
-		private ConcurrentDictionary<JsonString, JsonValue> data;
-	#else
-		private Dictionary<JsonString, JsonValue> data;
-	#endif
+	private IDictionary<JsonString, JsonValue> data;
+	
 	/// <inheritdoc />
 	public override JsonType JsonType { get { return JsonType.Object; } }
+
 	/// <summary> Number of Key/Value pairs in the JsonObject </summary>
 	public override int Count { get { return data.Count; } }
+
+	/// <summary> Returns true if the collection is empty. </summary>
+	public bool IsEmpty { get { return !data.Any(); } }
 
 	/// <summary> Indexes this JsonObject with a given key. Strings are perferred, but any JsonValue will be converted to a String and used. </summary>
 	/// <param name="key"> JsonValue to use to index this JsonObject. </param>
@@ -903,21 +1055,11 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 
 		set {
 			if (key.isString) {
-				#if XtoJSON_ConcurrentObjects
-				JsonValue rem;
-				if (value == null && data.ContainsKey((JsonString)key)) { data.TryRemove((JsonString)key, out rem); }
-				#else
 				if (value == null && data.ContainsKey((JsonString)key)) { data.Remove((JsonString)key); }
-				#endif
 				if (value != null) { data[(JsonString)key] = value; }
 			} else if (key.isBool || key.isNumber) {
 				string k = key.stringVal;
-				#if XtoJSON_ConcurrentObjects
-				JsonValue rem;
-				if (value == null && data.ContainsKey(k)) { data.TryRemove(k, out rem);}
-				#else
 				if (value == null && data.ContainsKey(k)) { data.Remove(k); }
-				#endif
 				if (value != null) { data[k] = value; }
 			} else {
 				throw new Exception(key.JsonType.ToString() + " is not a valid key for " + JsonType.ToString());
@@ -962,21 +1104,16 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <param name="keys"> Array of keys to check </param>
 	/// <returns> True if this object has any single key, false if the object contains NONE of the keys. </returns>
 	public bool HasAny(IEnumerable<string> keys) { return this.ContainsAnyKeys(keys.ToArray()); }
-
-	/// <summary> Default Constructor, creates an empty collection. </summary>
-	#if XtoJSON_ConcurrentObjects
-	public JsonObject() : base() { data = new ConcurrentDictionary<JsonString, JsonValue>(); }
-	#else
-	public JsonObject() : base() { data = new Dictionary<JsonString, JsonValue>(); }
-	#endif
+	
+	/// <summary> Default Constructor, creates an empty JsonObject with the standard Dictionary. </summary>
+	public JsonObject() : base() { data = DictionaryGenerator(); }
+	
 	/// <summary> Copy infomration from another JsonObject. This is a shallow copy. </summary>
 	public JsonObject(JsonObject src) : this() { Add(src); }
+	
 	/// <summary> Create an JsonObject, setting its data to the parameter. </summary>
-	#if XtoJSON_ConcurrentObjects
-	public JsonObject(ConcurrentDictionary<JsonString, JsonValue> src) : base() { data = src; }
-	#else
-	public JsonObject(Dictionary<JsonString, JsonValue> src) : base() { data = src; }
-	#endif
+	public JsonObject(IDictionary<JsonString, JsonValue> src) : base() { data = src; }
+	
 	/// <summary> Initialize with an array of key,value pairs</summary>
 	/// <param name="pairs">Pairs of values to use. Must be even in length, and contain 'JsonString,JsonValue' pairs</param>
 	public JsonObject(params JsonValue[] pairs) : this() {
@@ -987,11 +1124,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 				JsonValue val = pairs[i + 1];
 				if (val == null || val == JsonNull.instance) { continue; }
 
-				#if XtoJSON_ConcurrentObjects
 				data[key] = val;
-				#else
-				data.Add(key, val);
-				#endif
 			}
 
 		} else {
@@ -1010,11 +1143,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		if (value == JsonNull.instance) { return this; }
 
 		if (!data.ContainsKey(name)) {
-			#if XtoJSON_ConcurrentObjects
-			data[name] = value;
-			#else
 			data.Add(name, value);
-			#endif
 		}
 
 		return this;
@@ -1123,11 +1252,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public IEnumerator<KeyValuePair<JsonString, JsonValue>> Pairs { get { return data.GetEnumerator(); } }
 
 	/// <summary> Returns the internal dictionary. </summary>
-	#if XtoJSON_ConcurrentObjects
-	public ConcurrentDictionary<JsonString, JsonValue> GetData() { return data; }
-	#else
-	public Dictionary<JsonString, JsonValue> GetData() { return data; }
-	#endif
+	public IDictionary<JsonString, JsonValue> GetData() { return data; }
 	#region Dictionary Conversions
 	/// <summary> Gets a collection of all &lt;string, bool&gt; pairs </summary>
 	public Dictionary<string, bool> ToDictOfBool() {
@@ -1170,22 +1295,10 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		return d;
 	}
 	#endregion
-
-	/// <summary> Removes the KeyValue pair associated with the given key </summary>
-	#if XtoJSON_ConcurrentObjects
-	public JsonObject Remove(string key, out JsonValue rem) {
-		data.TryRemove(key, out rem);
-		return this; 
-	}
-	/// <summary> Removes the KeyValue pair associated with the given key </summary>
-	public JsonObject Remove(string key) {
-		JsonValue rem;
-		data.TryRemove(key, out rem);
-	#else
+	
 	/// <summary> Removes the KeyValue pair associated with the given key </summary>
 	public JsonObject Remove(string key) {
 		if (ContainsKey(key)) { data.Remove(key); }
-	#endif
 		return this;
 	}
 
@@ -1262,18 +1375,13 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		return first.CombineRecursively(second);
 	}
 
-	/// <summary> Takes all of the KeyValue pairs from the other object, and sets this object to have the same values for those keys. </summary>
-	/// <param name="other">Other object holding values to set</param>
-	/// <returns>The same object that this method was called on, after it has been modified</returns>
-	public JsonObject Set(JsonObject other) {
-		foreach (var pair in other) { this[pair.Key] = pair.Value; }
-		return this;
-	}
 
 	/// <summary> Combines this JsonObject with <paramref name="other"/>, into a new JsonObject. </summary>
 	/// <param name="other">Other JsonObject to combine with </param>
 	/// <returns>A new JsonObject containing values from this and <paramref name="other"/> </returns>
 	public JsonObject Combine(JsonObject other) { return Combine(this, other); }
+
+	//public JsonObject Combine(JsonObject other, params string[] lim) { return null; }
 
 	/// <summary> Combines <paramref name="first"/> and <paramref name="second"/> into a new JsonObject </summary>
 	/// <param name="first">First JsonObject</param>
@@ -1283,6 +1391,25 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		return new JsonObject().Set(first).Set(second);
 	}
 
+
+	/// <summary> Takes all of the KeyValue pairs from the other object, and sets this object to have the same values for those keys. </summary>
+	/// <param name="other">Other object holding values to set</param>
+	/// <returns>The same object that this method was called on, after it has been modified</returns>
+	public JsonObject Set(JsonObject other) {
+		foreach (var pair in other) { this[pair.Key] = pair.Value; }
+		return this;
+	}
+
+	/// <summary> Takes a given subset of key/value pairs from another object and applies them to his object. </summary>
+	/// <param name="other">Other object holding values to set </param>
+	/// <param name="lim">Subset of keys to set on the current object, given <paramref name="other"/> also contains them.</param>
+	/// <returns>The same object that this method was called on, after it has been modified</returns>
+	public JsonObject Set(JsonObject other, params string[] lim) {
+		foreach (var param in lim) {
+			if (other.ContainsKey(param)) { this[param] = other[param]; }
+		}
+		return this;
+	}
 
 	/// <summary> Takes all of the pairs from a dictionary, 
 	/// and sets this object to have the JsonValue version of the Values associated with the key </summary>
@@ -1300,6 +1427,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		return this;
 	}
 
+	
 	/// <summary>
 	/// Compares keys between two JsonObjects
 	/// If the values of the keys are the same (including 'not being there'), returns true.
@@ -1702,6 +1830,7 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
 		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
+		
 
 		List<T> arr = new List<T>();
 		for (int i = 0; i < Count; i++) {
@@ -1710,12 +1839,16 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 			bool setVal = false;
 			if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; } else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; } else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; } else if (val.isNull) { sval = (T)(object)null; } else if (val.isObject) {
 				JsonObject jobj = val as JsonObject;
-				object obj = constructor.Invoke(new object[] { });
-				JsonReflector.ReflectInto(jobj, obj);
+				object obj;
+				if (type.IsValueType) {
+					obj = Json.GetValue(jobj, type);
+				} else {
+					obj = constructor.Invoke(new object[] { });
+					JsonReflector.ReflectInto(jobj, obj);
+				}
 				sval = (T)obj;
 				setVal = true;
 			}
-
 			if (setVal) { arr.Add(sval); }
 		}
 		return arr;
@@ -1901,6 +2034,19 @@ public class JsonReflector {
 
 	/// <summary> Contains all blacklisted types (reflect to null by default) </summary>
 	public static HashSet<Type> blacklist = new HashSet<Type>();
+	
+	/// <summary> Custom generators for types. </summary>
+	private static Dictionary<Type, Func<JsonValue, object>> generators = new Dictionary<Type, Func<JsonValue, object>>();
+
+	/// <summary> Registers a custom generator for the given type </summary>
+	/// <typeparam name="T"> Generic type to know what type to bind to </typeparam>
+	/// <param name="generator"> Function taking a JsonValue and yielding a T </param>
+	public static void RegisterGenerator<T>(Func<JsonValue, object> generator) { generators[typeof(T)] = generator; }
+
+	/// <summary> Removes the generator for the given type, if you need to clean up your mess. </summary>
+	/// <typeparam name="T"> Generic type to know what type to unbind </typeparam>
+	public static void UnregisterGenerator<T>() { generators.Remove(typeof(T)); }
+
 	/// <summary> Blacklist a given type from being reflected </summary>
 	/// <param name="t">Type to blacklist</param>
 	public static void Blacklist(Type t) {
@@ -1933,10 +2079,18 @@ public class JsonReflector {
 	/// <summary> Reflect a JsonValue based on a given type. Attempts to return an object, 
 	/// so return value may be null even if a value type is requested. </summary>
 	public static object GetReflectedValue(JsonValue val, Type destType) {
+		if (destType.IsJsonType()) { return val.DeepCopy(); }
 		if (val == null || blacklist.Contains(destType)) { return null; }
 
 		object sval = null;
-		if (val.isString && destType == typeof(string)) { sval = val.stringVal; } else if (val.isString && destType.IsNumeric()) {
+		if (generators.ContainsKey(destType)) {
+			//var generator = generators[destType] as Func<JsonValue, object>;
+			//sval = generator?.Invoke(val);
+			var gen = generators[destType] as Func<JsonValue, object>;
+			sval = gen.DynamicInvoke(val);
+		}
+		else if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
+		else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
 			sval = Convert.ChangeType(numVal, destType);
@@ -1946,7 +2100,14 @@ public class JsonReflector {
 			} catch {
 				sval = Enum.ToObject(destType, 0);
 			}
-		} else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } else if (val.isArray && destType.IsArray) {
+		} 
+		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } 
+		else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } 
+		else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } 
+		else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } 
+		else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } 
+		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } 
+		else if (val.isArray && destType.IsArray) {
 			//TBD: Reflect the JsonArray into a new array
 			JsonArray arr = val as JsonArray;
 			Type eleType = destType.GetElementType();
@@ -2258,7 +2419,6 @@ public class JsonDeserializer {
 
 			return val;
 		}
-
 		int startIndex = index;
 		while (index < json.Length && next != ',' && next != '}' && next != ']' && !char.IsWhiteSpace(next)) {
 			index++;
@@ -2336,8 +2496,16 @@ public class JsonDeserializer {
 			string key = ProcessKey();
 			key = key.JsonUnescapeString();
 			SkipWhitespace();
-			JsonValue val = ProcessValue();
-			obj.Add(key, val);
+			
+			if (next == ',' || next == '}') { 
+				obj.Add(key, true); 
+			}
+			if (next == ':') {
+				index++;
+				SkipWhitespace();
+				JsonValue val = ProcessValue();
+				obj.Add(key, val);
+			}
 			if (!MoveNext()) { break; }
 		}
 
@@ -2360,7 +2528,7 @@ public class JsonDeserializer {
 #endif
 			}
 			if (index >= json.Length) { return false; }
-
+			
 		} else {
 			if (json[index] == ']' || json[index] == '}') {
 				index++;
@@ -2372,32 +2540,56 @@ public class JsonDeserializer {
 		return true;
 	}
 
+	internal static bool IsAlpha(char c) {
+		return c == '$' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+	}
+	internal static bool IsAlphaNum(char c) {
+		return c == '$' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
+	}
 	/// <summary> Logic for extracting a string value from the text </summary>
 	string ProcessKey() {
-		int startIndex = index + 1;
+		int startIndex = -1;
 		int endIndex = -1;
 		if (next == '"') {
-			while (json[index++] != ':' || endIndex == -1) {
+			startIndex = index + 1;
+			while (json[index] != ':' || endIndex == -1) {
+				index++;
 				if (json[index] == '\"' && json[index - 1] != '\\') {
 					endIndex = index;
 				}
 			}
-			return json.Substring(startIndex, endIndex - startIndex).TrimEnd();
+			
+
+		} else {
+			startIndex = index;
+			int i = index;
+			char c = json[i];
+			if (IsAlpha(c)) {
+				i++;
+				while (true) {
+					c = json[i++];
+					if (!IsAlphaNum(c)) { break; }
+				}
+			}
+			
+			endIndex = i-1;
+			index = endIndex;	
 		}
-		startIndex = index;
-		endIndex = json.IndexOf(':', index);
-		index = endIndex + 1;
+
+
+		
 		return json.Substring(startIndex, endIndex - startIndex).TrimEnd();
 	}
 
 	/// <summary> Logic to skip over whitespace until a non whitespace character or the end of the file. </summary>
-	void SkipWhitespaceEnd() {
+	void SkipWhitespaceEnd() { 
 		while (index < json.Length && char.IsWhiteSpace(next)) { index++; }
 	}
 	/// <summary> Logic to skip to the next non-whitepace character </summary>
 	void SkipWhitespace() {
 		while (char.IsWhiteSpace(next)) { index++; }
 	}
+
 
 }
 
@@ -2777,9 +2969,21 @@ public static class JsonOperations {
 	}
 
 
+	/// <summary> Reduces arrays to single values for the given set of fields </summary>
+	/// <param name="source"> Source Object to reduce arrays within </param>
+	/// <param name="fields"> Fields to check for arrays to reduce </param>
+	/// <param name="reductor"> Function to use to pick a value from the arrays </param>
+	/// <returns></returns>
+	public static JsonObject ReduceArrays(this JsonObject source, string[] fields, Func<JsonArray, JsonValue> reductor) {
+
+		foreach (var field in fields) {
+			var val = source[field];
+			if (val.isArray) { source[field] = reductor(val as JsonArray); }
+		}
+		return source;
+	}
 
 }
-
 #endregion
 
 

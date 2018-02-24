@@ -23,6 +23,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Collections.Concurrent;
 
 #if UNITY
 namespace JsonTests_ {
@@ -30,7 +31,8 @@ namespace JsonTests_ {
 	[ExecuteInEditMode] public class Tests : MonoBehaviour {
 		
 		#if UNITY_EDITOR
-		public string JsonTestObject = "Last Updated 1.1.0";
+		[Tooltip("This Behaviour is the Json Test Object.")]
+		public string JsonTestObject = "Last Updated 2.0.0";
 		public bool go = false;
 		public void Update() {
 			if (go) {
@@ -218,6 +220,21 @@ public static class JsonTests {
 		if (b) { throw new AssertFailed("ShouldBeFalse", "Expression should have been false, but was true"); }
 	}
 
+	/// <summary> Tests similarity between arrays. They are considered same if same length and each parallel element equal. </summary>
+	/// <typeparam name="T"> Generic type </typeparam>
+	/// <param name="a"> First array </param>
+	/// <param name="b"> Second (expected) array </param>
+	private static void ShouldBeSame<T>(this T[] a, T[] b) {
+		if (a == null) { throw new AssertFailed("ShouldBeSame", "Arrays cannot be null- source array was null!"); }
+		if (b == null) { throw new AssertFailed("ShouldBeSame", "Arrays cannot be null- expected array was null!"); }
+		if (a.Length != b.Length) { throw new AssertFailed("ShouldBeSame", string.Format("Arrays not the same length!\n\tExpected\n\t{1},\n\thad\n\t{0}", a.Length, b.Length)); }
+		for (int i = 0; i < a.Length; i++) {
+			if (!a[i].Equals(b[i])) {
+				throw new AssertFailed("ShouldBeSame", string.Format("Array elements at\n\t{0}\n\tdid not match.\n\tExpected\n\t{2}\n\thad\n\t{1}", i, a[i], b[i]));
+			}
+		}
+	}
+
 	/// <summary> Throws an AssertFailed. Marks a line of code as something that should not be reached. </summary>
 	private static void ShouldNotRun() {
 		throw new AssertFailed("ShouldNotRun", "Line of code invokign this method should not have been reached.");
@@ -286,6 +303,8 @@ public static class JsonTests {
 		Encoding encoding = Encoding.ASCII;
 		TextWriter logWriter = new StreamWriter(logStream, encoding);
 		
+		int success = 0;
+		int failure = 0;
 		Out = logWriter;
 		Log("Testing Log Follows:");
 
@@ -295,6 +314,7 @@ public static class JsonTests {
 			try {
 				test.Invoke(null, empty);
 				Log("\tSuccess!");
+				success++;
 				
 			} catch (TargetInvocationException e) {
 				if (e.InnerException != null) {
@@ -312,24 +332,124 @@ public static class JsonTests {
 					Log("\tInner: " + ex.InnerException);
 					
 				}
+				failure++;
 			} catch (Exception e) {
 				Log("Unexpected Exception:\n\t" + e.GetType().Name);
 				Log("\tFull Trace: " + e.StackTrace);
+				failure++;
 			}
 			Log("\n");
 		}
 
 		logWriter.Flush();
 		Out = null;
-		return encoding.GetString(logStream.ToArray());
+		StringBuilder strb = new StringBuilder();
+		strb.Append(string.Format("Summary: {0} success, {1} failure\n", success, failure) );
+		strb.Append(encoding.GetString(logStream.ToArray()));
+
+		
+		return strb.ToString();
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	// Test Code
+	public class TestReflecting {
+		private class PrimitivesModel {
+			public float value1 = 1;
+			public float value2 = 2;
+			public double dvalue = 55;
+			public string str = "defaultString";
+			public bool flag1 = false;
+			public bool flag2 = true;
+			public override bool Equals(object obj) {
+				if (!(obj is PrimitivesModel)) { return false; }
+				var o = obj as PrimitivesModel;
+				return value1 == o.value1 && value2 == o.value2 && dvalue == o.dvalue && str == o.str && flag1 == o.flag1 && flag2 == o.flag2;
+			}
+			public override int GetHashCode() { return -1; }
+		}
+		public static void TestObjectParse1() {
+			{
+				PrimitivesModel model = new PrimitivesModel();
+				PrimitivesModel fromEmpty = Json.GetValue<PrimitivesModel>(new JsonObject());
+				model.ShouldEqual(fromEmpty);
+			}
+
+			{
+				PrimitivesModel model = new PrimitivesModel();
+				model.str = "otherString";
+				model.flag1 = true;
+				model.value2 = 50;
+				JsonObject delta = new JsonObject("str", "otherString", "flag1", true, "value2", 50);
+				PrimitivesModel fromDelta = Json.GetValue<PrimitivesModel>(delta);
+				model.ShouldEqual(fromDelta);
+			}
+		}
+
+		private class ArraysModel {
+			public float[] floats = new float[] { 3 };
+			public string[] strs = new string[] { "nope" };
+			public bool[] flags = new bool[] { false };
+		}
+		public static void TestArrayReflection() {
+			{
+				JsonObject obj = new JsonObject();
+				obj["floats"] = new JsonArray(0, 1, 2, 3, 4, 5, 6);
+				obj["strs"] = new JsonArray("oh", "bob", "saget");
+				obj["flags"] = new JsonArray(true, true, false, true, false, false);
+
+				ArraysModel model = new ArraysModel();
+				model.floats = new float[] { 0f, 1f, 2f, 3f, 4f, 5f, 6f };
+				model.strs = new string[] { "oh", "bob", "saget" };
+				model.flags = new bool[] { true, true, false, true, false, false };
+
+				ArraysModel reflected = Json.GetValue<ArraysModel>(obj);
+				reflected.floats.ShouldBeSame(model.floats);
+				reflected.strs.ShouldBeSame(model.strs);
+				reflected.flags.ShouldBeSame(model.flags);
+			}
+		}
+
+		private class JsonValuesModels {
+			public JsonArray arr = new JsonArray(12);
+			public JsonObject obj = new JsonObject("nope", 5);
+			public JsonString str = "yep";
+			public JsonNumber num = 200;
+			public JsonBool flg = false;
+			public override bool Equals(object other) {
+				if (!(other is JsonValuesModels)) { return false; }
+				var o = other as JsonValuesModels;
+				return arr.Equals(o.arr) && obj.Equals(o.obj) && str == o.str && num == o.num && flg == o.flg;
+			}
+			public override int GetHashCode() { return -1; }
+		}
+
+		
+		public static void TestJsonValueReflection() {
+			{
+				JsonObject obj = new JsonObject();
+				obj["arr"] = new JsonArray(1,2,3,4);
+				obj["obj"] = new JsonObject("yeah", 20);
+				obj["str"] = "naw";
+				obj["num"] = 300;
+				obj["flg"] = true;
+
+				JsonValuesModels model = new JsonValuesModels();
+				model.arr = new JsonArray(1,2,3,4);
+				model.obj = new JsonObject("yeah", 20);
+				model.str = "naw";
+				model.num = 300;
+				model.flg = true;
+
+				JsonValuesModels reflected = Json.GetValue<JsonValuesModels>(obj);
+				reflected.ShouldEqual(model);
+			}
+		}
+	}
+
 	/// <summary> Test holding JsonObject test functions </summary>
-	
 	public class TestJsonObject {
 		public static void TestObjectAdd() {
 			{
@@ -341,6 +461,23 @@ public static class JsonTests {
 					.Add("okay", "alright");
 
 				obj.Count.ShouldBe(2);
+			}
+		}
+		public static void TestEmpty() {
+			{
+				JsonObject empty = new JsonObject();
+				JsonObject emptyConcurrent = new JsonObject(new ConcurrentDictionary<JsonString, JsonValue>());
+
+				empty.IsEmpty.ShouldBeTrue();
+				emptyConcurrent.IsEmpty.ShouldBeTrue();
+
+				JsonObject notEmpty = new JsonObject("ayy", "lmao");
+				JsonObject notEmptyConcurrent = new JsonObject(new ConcurrentDictionary<JsonString, JsonValue>());
+				notEmptyConcurrent.Add("ayy", "lmao");
+
+				notEmpty.IsEmpty.ShouldBeFalse();
+				notEmptyConcurrent.IsEmpty.ShouldBeFalse();
+
 			}
 		}
 		public static void TestObjectVectOps() {
@@ -948,18 +1085,23 @@ public static class JsonTests {
 			JsonNumber a = 5;
 			JsonNumber b = 5;
 			JsonNumber c = 10;
+			JsonNumber zeroA = 0;
+			JsonNumber zeroB = Json.Parse("{z:0}")["z"] as JsonNumber;
 
 			(a == b).ShouldBeTrue();
 			(a == 5).ShouldBeTrue();
 			(a != c).ShouldBeTrue();
 			(c == 10).ShouldBeTrue();
+			(zeroA == zeroB).ShouldBeTrue();
 
 			a.ShouldEqual(b);
 			a.ShouldEqual(5);
 			a.ShouldNotEqual(c);
 			c.ShouldEqual(10);
+			zeroA.ShouldEqual(0);
+			zeroB.ShouldEqual(0);
 
-		}
+			}
 
 		{ // Infinity and NaN
 			JsonValue jminf = double.NegativeInfinity;
