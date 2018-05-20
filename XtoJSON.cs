@@ -88,7 +88,7 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 0;
+	public const int MINOR = 1;
 	/// <summary> Sub-minor version Revision number </summary>
 	public const int REV = 0;
 
@@ -137,7 +137,8 @@ public static class Json {
 	public static object GetValue(JsonValue val, Type destType) { return JsonReflector.GetReflectedValue(val, destType); }
 	/// <summary> Reflect a JsonValue into a specified type. </summary>
 	public static T GetValue<T>(JsonValue val) {
-		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); } else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
+		if (typeof(JsonObject).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonObject); } 
+		else if (typeof(JsonArray).IsAssignableFrom(typeof(T))) { return (T)(object)(val as JsonArray); }
 
 		object o = GetValue(val, typeof(T));
 		if (o == null) { return default(T); }
@@ -1820,8 +1821,6 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 		return arr;
 	}
 
-
-
 	/// <summary> Get an array of all JsonObjects as T values  </summary>
 	/// <returns> T[] of all of the JsonObjects in this JsonArray reflected into objects of type 'T' </returns>
 	public T[] ToArrayOf<T>() { return ToListOf<T>().ToArray(); }
@@ -1830,14 +1829,30 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 	public List<T> ToListOf<T>() {
 		Type type = typeof(T);
 		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
+		Type innerType = type.IsGenericType ? type.GetGenericArguments()[0] : null;
+		MethodInfo nullableGrabber = innerType != null ? JsonReflector.toNullable.MakeGenericMethod(new Type[] { innerType }) : null;
 		
 
-		List<T> arr = new List<T>();
+		List<T> arr = new List<T>(Count);
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
+			if (ReferenceEquals(val, null)) { val = JsonNull.instance; }
 			T sval = default(T);
 			bool setVal = false;
-			if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; } else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; } else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; } else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; } else if (val.isNull) { sval = (T)(object)null; } else if (val.isObject) {
+
+			if (type.IsNullableType()) {
+				sval = (T) nullableGrabber.Invoke(null, new object[] { val } );
+				setVal = true;
+			}
+			else if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; } 
+			else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; } 
+			else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; } 
+			else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; } 
+			else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; } 
+			else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; } 
+			else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; }
+			else if (val.isNull) { sval = (T)(object)null; } 
+			else if (val.isObject) {
 				JsonObject jobj = val as JsonObject;
 				object obj;
 				if (type.IsValueType) {
@@ -1863,7 +1878,15 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 		List<object> arr = new List<object>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
-			if (val.isString && type == typeof(string)) { arr.Add(val.stringVal); } else if (val.isNumber && type == typeof(double)) { arr.Add(val.numVal); } else if (val.isNumber && type == typeof(int)) { arr.Add((int)val.numVal); } else if (val.isNumber && type == typeof(float)) { arr.Add((float)val.numVal); } else if (val.isNumber && type == typeof(byte)) { arr.Add((byte)val.numVal); } else if (val.isNumber && type == typeof(long)) { arr.Add((long)val.numVal); } else if (val.isBool && type == typeof(bool)) { arr.Add(val.boolVal); } else if (val.isNull) { arr.Add(null); } else if (val.isObject && constructor != null) {
+			if (val.isString && type == typeof(string)) { arr.Add(val.stringVal); } 
+			else if (val.isNumber && type == typeof(double)) { arr.Add(val.numVal); } 
+			else if (val.isNumber && type == typeof(int)) { arr.Add((int)val.numVal); } 
+			else if (val.isNumber && type == typeof(float)) { arr.Add((float)val.numVal); }
+			else if (val.isNumber && type == typeof(byte)) { arr.Add((byte)val.numVal); } 
+			else if (val.isNumber && type == typeof(long)) { arr.Add((long)val.numVal); } 
+			else if (val.isBool && type == typeof(bool)) { arr.Add(val.boolVal); } 
+			else if (val.isNull) { arr.Add(null); } 
+			else if (val.isObject && constructor != null) {
 				object obj = constructor.Invoke(new object[] { });
 				JsonObject jobj = val as JsonObject;
 				JsonReflector.ReflectInto(jobj, obj);
@@ -2020,12 +2043,14 @@ public class JsonPrettyPrinter {
 //JsonReflector
 
 /// <summary> Class containing Reflection Code </summary>
-public class JsonReflector {
+public static class JsonReflector {
 
-	/// <summary> Grab method info for JsonArray.ToArrayOf&lt;T&gt;() </summary>
-	static MethodInfo toArrayOf = typeof(JsonArray).GetMethod("ToArrayOf");
-	/// <summary> Grab method info for JsonArray.ToListOf&lt;T&gt;() </summary>
-	static MethodInfo toListOf = typeof(JsonArray).GetMethod("ToListOf");
+	/// <summary> Grab method info for JsonArray.ToArrayOf&lt;T&gt;() for generic insertion  </summary>
+	public static readonly MethodInfo toArrayOf = typeof(JsonArray).GetMethod("ToArrayOf");
+	/// <summary> Grab method info for JsonArray.ToListOf&lt;T&gt;() for generic insertion  </summary>
+	public static readonly MethodInfo toListOf = typeof(JsonArray).GetMethod("ToListOf");
+	/// <summary> Grab method info for JsonReflector.ToNullable&lt;T&gt;() for generic insertion </summary>
+	public static readonly MethodInfo toNullable = typeof(JsonReflector).GetMethod("ToNullable");
 
 	/// <summary> Binding flags for easy usage </summary>
 	static BindingFlags publicMembers = BindingFlags.Instance | BindingFlags.Public;
@@ -2059,6 +2084,19 @@ public class JsonReflector {
 		if (blacklist.Contains(t)) { blacklist.Remove(t); }
 	}
 
+	public static Nullable<T> NullableOfNull<T>() where T : struct { return new Nullable<T>(); }
+	public static Nullable<T> ToNullable<T>(JsonValue val) where T : struct {
+		if (ReferenceEquals(val, null)) { return NullableOfNull<T>(); }
+		object obj = GetReflectedValue(val, typeof(T));
+		if (obj == null) { return NullableOfNull<T>(); }
+		return new Nullable<T>( (T) obj );
+	}
+
+	public static bool IsNullableType(this Type type) {
+		return type.IsGenericType && typeofNullable == type.GetGenericTypeDefinition();
+	}
+
+	static readonly Type typeofNullable = typeof(Nullable<int>).GetGenericTypeDefinition();
 	static readonly Type typeofPhysicMaterial = Type.GetType("UnityEngine.PhysicMaterial, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	static readonly Type typeofMaterial = Type.GetType("UnityEngine.Material, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	static readonly Type typeofQuaternion = Type.GetType("UnityEngine.Quaternion, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
@@ -2075,20 +2113,23 @@ public class JsonReflector {
 		return true;
 	}
 
-
 	/// <summary> Reflect a JsonValue based on a given type. Attempts to return an object, 
 	/// so return value may be null even if a value type is requested. </summary>
 	public static object GetReflectedValue(JsonValue val, Type destType) {
 		if (destType.IsJsonType()) { return val.DeepCopy(); }
 		if (val == null || blacklist.Contains(destType)) { return null; }
-
 		object sval = null;
+		
 		if (generators.ContainsKey(destType)) {
 			//var generator = generators[destType] as Func<JsonValue, object>;
 			//sval = generator?.Invoke(val);
 			var gen = generators[destType] as Func<JsonValue, object>;
 			sval = gen.DynamicInvoke(val);
-		}
+		} else if (destType.IsNullableType()) {
+			Type genericType = destType.GetGenericArguments()[0];
+			MethodInfo genericGrabber = toNullable.MakeGenericMethod(genericType);
+			sval = genericGrabber.Invoke(null, new object[] { val });
+		} 
 		else if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
 		else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
@@ -2269,7 +2310,15 @@ public class JsonReflector {
 		JsonValue jval = null;
 
 		//Handle primitive types
-		if (type == typeof(string)) { return ((string)source); } else if (type == typeof(double)) { return ((double)source); } else if (type == typeof(int)) { return ((int)source); } else if (type == typeof(float)) { return ((float)source); } else if (type == typeof(byte)) { return ((byte)source); } else if (type == typeof(long)) { return ((long)source); } else if (type == typeof(short)) { return ((short)source); } else if (type == typeof(bool)) { return ((bool)source); } else if (type.IsArray) {
+		if (type == typeof(string)) { return ((string)source); } 
+		else if (type == typeof(double)) { return ((double)source); } 
+		else if (type == typeof(int)) { return ((int)source); } 
+		else if (type == typeof(float)) { return ((float)source); } 
+		else if (type == typeof(byte)) { return ((byte)source); } 
+		else if (type == typeof(long)) { return ((long)source); } 
+		else if (type == typeof(short)) { return ((short)source); } 
+		else if (type == typeof(bool)) { return ((bool)source); } 
+		else if (type.IsArray) {
 			JsonArray arr = new JsonArray();
 			jval = arr;
 			Array obj = source as Array;

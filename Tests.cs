@@ -32,12 +32,14 @@ namespace JsonTests_ {
 		
 		#if UNITY_EDITOR
 		[Tooltip("This Behaviour is the Json Test Object.")]
-		public string JsonTestObject = "Last Updated 2.0.0";
+		public string JsonTestObject = "Last Updated 2.1.0";
 		public bool go = false;
 		public void Update() {
 			if (go) {
 				go = false;
+				
 				Debug.Log(JsonTests.RunTests());
+
 			}
 		}
 		#endif
@@ -200,6 +202,38 @@ public static class JsonTests {
 	private static void ShouldEqual(this object obj, object other) {
 		if (!obj.Equals(other)) { throw new AssertFailed("ShouldEqual", "Values\n\t" + obj.Info() + "\nand\n\t" + other.Info() + "\nShould have been .Equal(), but were not."); }
 	}
+	
+	/// <summary> Tests two enumerable collections to make sure their sequences match a predicate that takes values from each sequence </summary>
+	/// <typeparam name="T">Generic type </typeparam>
+	/// <param name="coll"> Collection to test </param>
+	/// <param name="other"> Expected collection to pair with </param>
+	/// <param name="predicate"> Predicate to derermine if the test passes. </param>
+	private static void ShouldEachMatch<T>(this IEnumerable<T> coll, IEnumerable<T> other, Func<T, T, bool> predicate) {
+		var ita = coll.GetEnumerator();
+		var itb = other.GetEnumerator();
+		int sizeA = 0;
+		int sizeB = 0;
+		while (ita.MoveNext()) {
+			sizeA++;
+			if (!itb.MoveNext()) {
+				throw new AssertFailed("ShouldBe", $"Collection A was at least size {sizeA}, but Collection B was only size {sizeB}");
+			}
+			sizeB++;
+
+			var a = ita.Current;
+			var b = itb.Current;
+			if (!predicate(a,b)) {
+				throw new AssertFailed("ShouldBe", $"Values A\n\t{a}\nand B\n\t{b}\nDid not satisfy predicate");
+			}
+
+		}
+		if (itb.MoveNext()) {
+			sizeB++;
+			throw new AssertFailed("ShouldBe", $"Collection A was only size {sizeA}, but Collection B was at laest size {sizeB}");
+		}
+	}
+
+
 
 	/// <summary> Tests two things, and throws an exception if they are not equal by Equals in one direction (!obj.Equals(other)) </summary>
 	/// <param name="obj"> Object to test </param>
@@ -1075,135 +1109,188 @@ public static class JsonTests {
 			}
 		}
 		public static void TestEqualities() {
-		{ // JsonNull
-			(JsonNull.instance == null).ShouldBeTrue();
-			JsonNull.instance.ShouldEqual(null);
-
-		}
-
-		{ // JsonNumber
-			JsonNumber a = 5;
-			JsonNumber b = 5;
-			JsonNumber c = 10;
-			JsonNumber zeroA = 0;
-			JsonNumber zeroB = Json.Parse("{z:0}")["z"] as JsonNumber;
-
-			(a == b).ShouldBeTrue();
-			(a == 5).ShouldBeTrue();
-			(a != c).ShouldBeTrue();
-			(c == 10).ShouldBeTrue();
-			(zeroA == zeroB).ShouldBeTrue();
-
-			a.ShouldEqual(b);
-			a.ShouldEqual(5);
-			a.ShouldNotEqual(c);
-			c.ShouldEqual(10);
-			zeroA.ShouldEqual(0);
-			zeroB.ShouldEqual(0);
+			{ // JsonNull
+				(JsonNull.instance == null).ShouldBeTrue();
+				JsonNull.instance.ShouldEqual(null);
 
 			}
 
-		{ // Infinity and NaN
-			JsonValue jminf = double.NegativeInfinity;
-			JsonValue jpinf = double.PositiveInfinity;
-			JsonValue jnan = double.NaN;
+			{ // JsonNumber
+				JsonNumber a = 5;
+				JsonNumber b = 5;
+				JsonNumber c = 10;
+				JsonNumber zeroA = 0;
+				JsonNumber zeroB = Json.Parse("{z:0}")["z"] as JsonNumber;
 
-			double minf = double.NegativeInfinity;
-			double pinf = double.PositiveInfinity;
-			double nan = double.NaN;
+				(a == b).ShouldBeTrue();
+				(a == 5).ShouldBeTrue();
+				(a != c).ShouldBeTrue();
+				(c == 10).ShouldBeTrue();
+				(zeroA == zeroB).ShouldBeTrue();
 
-			(jpinf == pinf).ShouldBeTrue();
-			(jminf == minf).ShouldBeTrue();
-			(jnan == nan).ShouldBeTrue();
+				a.ShouldEqual(b);
+				a.ShouldEqual(5);
+				a.ShouldNotEqual(c);
+				c.ShouldEqual(10);
+				zeroA.ShouldEqual(0);
+				zeroB.ShouldEqual(0);
 
-			jpinf.ShouldEqual(pinf);
-			jminf.ShouldEqual(minf);
-			jnan.ShouldEqual(nan);
+				}
 
-			jpinf.ShouldNotBe(jminf);
-			jpinf.ShouldNotBe(minf);
-			jpinf.ShouldNotBe(jnan);
-			jpinf.ShouldNotBe(nan);
+			{ // Infinity and NaN
+				JsonValue jminf = double.NegativeInfinity;
+				JsonValue jpinf = double.PositiveInfinity;
+				JsonValue jnan = double.NaN;
 
-			jminf.ShouldNotBe(jpinf);
-			jminf.ShouldNotBe(pinf);
-			jminf.ShouldNotBe(jnan);
-			jminf.ShouldNotBe(nan);
+				double minf = double.NegativeInfinity;
+				double pinf = double.PositiveInfinity;
+				double nan = double.NaN;
 
-			jnan.ShouldNotBe(jpinf);
-			jnan.ShouldNotBe(pinf);
-			jnan.ShouldNotBe(jminf);
-			jnan.ShouldNotBe(minf);
-		}
+				(jpinf == pinf).ShouldBeTrue();
+				(jminf == minf).ShouldBeTrue();
+				(jnan == nan).ShouldBeTrue();
 
-		{ // JsonStrings
-			JsonString a = "hullo";
-			JsonString b = "hullo";
-			JsonString c = "bob saget";
+				jpinf.ShouldEqual(pinf);
+				jminf.ShouldEqual(minf);
+				jnan.ShouldEqual(nan);
 
-			(a == b).ShouldBeTrue();
-			(a == "hullo").ShouldBeTrue();
-			(a != c).ShouldBeTrue();
-			(c == "bob saget").ShouldBeTrue();
+				jpinf.ShouldNotBe(jminf);
+				jpinf.ShouldNotBe(minf);
+				jpinf.ShouldNotBe(jnan);
+				jpinf.ShouldNotBe(nan);
 
-			a.ShouldEqual(b);
-			a.ShouldEqual("hullo");
-			a.ShouldNotEqual(c);
-			c.ShouldEqual("bob saget");
-		}
+				jminf.ShouldNotBe(jpinf);
+				jminf.ShouldNotBe(pinf);
+				jminf.ShouldNotBe(jnan);
+				jminf.ShouldNotBe(nan);
 
-		{ // JsonBool
-			JsonBool a = true;
-			JsonBool c = false;
+				jnan.ShouldNotBe(jpinf);
+				jnan.ShouldNotBe(pinf);
+				jnan.ShouldNotBe(jminf);
+				jnan.ShouldNotBe(minf);
+			}
 
-			ShouldBeTrue(a);
-			(a != c).ShouldBeTrue();
-			ShouldBeFalse(c);
+			{ // JsonStrings
+				JsonString a = "hullo";
+				JsonString b = "hullo";
+				JsonString c = "bob saget";
+
+				(a == b).ShouldBeTrue();
+				(a == "hullo").ShouldBeTrue();
+				(a != c).ShouldBeTrue();
+				(c == "bob saget").ShouldBeTrue();
+
+				a.ShouldEqual(b);
+				a.ShouldEqual("hullo");
+				a.ShouldNotEqual(c);
+				c.ShouldEqual("bob saget");
+			}
+
+			{ // JsonBool
+				JsonBool a = true;
+				JsonBool c = false;
+
+				ShouldBeTrue(a);
+				(a != c).ShouldBeTrue();
+				ShouldBeFalse(c);
 			
+			}
+
+			{ // JsonObject
+				JsonObject a = new JsonObject()
+					.Add("name", "bob saget")
+					.Add("paperTowels", 50)
+					.Add("hasBalls", true);
+
+				JsonObject b = new JsonObject()
+					.Add("name", "bob saget")
+					.Add("paperTowels", 50)
+					.Add("hasBalls", true);
+
+				JsonObject c = new JsonObject()
+					.Add("name", "bobby bob bobberton")
+					.Add("paperTowels", "three hundred")
+					.Add("hasBalls", "yes");
+
+				a.ShouldEqual(b);
+				a.ShouldNotBe(b);
+				a.ShouldNotBe(c);
+				a.ShouldNotEqual(c);
+
+				a.Add("son", c);
+				b.Add("son", c.Clone());
+
+				a.ShouldEqual(b);
+				a.ShouldNotBe(b);
+
+				a["son"].ShouldBe(c);
+				a["son"].ShouldEqual(c);
+
+				b["son"].ShouldNotBe(c);
+				b["son"].ShouldEqual(c);
+			}
 		}
 
-		{ // JsonObject
-			JsonObject a = new JsonObject()
-				.Add("name", "bob saget")
-				.Add("paperTowels", 50)
-				.Add("hasBalls", true);
-
-			JsonObject b = new JsonObject()
-				.Add("name", "bob saget")
-				.Add("paperTowels", 50)
-				.Add("hasBalls", true);
-
-			JsonObject c = new JsonObject()
-				.Add("name", "bobby bob bobberton")
-				.Add("paperTowels", "three hundred")
-				.Add("hasBalls", "yes");
-
-			a.ShouldEqual(b);
-			a.ShouldNotBe(b);
-			a.ShouldNotBe(c);
-			a.ShouldNotEqual(c);
-
-			a.Add("son", c);
-			b.Add("son", c.Clone());
-
-			a.ShouldEqual(b);
-			a.ShouldNotBe(b);
-
-			a["son"].ShouldBe(c);
-			a["son"].ShouldEqual(c);
-
-			b["son"].ShouldNotBe(c);
-			b["son"].ShouldEqual(c);
-		}
-
-		
-
-	}
 	}
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
-	
+	public static class TestExt {
+
+		public class NullableModel {
+			public float? nullFloat;
+			public int? nullInt;
+			public int?[] nullIntArray;
+		}
+
+		public static void TestReflectNullables() {
+			{
+				JsonObject obj = new JsonObject();
+				NullableModel model = Json.GetValue<NullableModel>(obj);
+
+				model.nullFloat.HasValue.ShouldBeFalse();
+				model.nullInt.HasValue.ShouldBeFalse();
+				model.nullIntArray.ShouldBe(null);
+			}
+
+			{
+				JsonObject obj = new JsonObject();
+				obj["nullFloat"] = 5.5;
+				obj["nullInt"] = 5;
+				JsonArray arr = new JsonArray(1, 2, 3, null, 5, 6);
+				obj["nullIntArray"] = arr;
+
+				NullableModel model = Json.GetValue<NullableModel>(obj);
+				model.nullFloat.HasValue.ShouldBeTrue();
+				model.nullFloat.Value.ShouldBe(5.5f);
+				model.nullInt.HasValue.ShouldBeTrue();
+				model.nullInt.Value.ShouldBe(5);
+				
+				int?[] checkArr = new int?[] { 1, 2, 3, null, 5, 6 };
+
+				model.nullIntArray.ShouldBeSame(checkArr);
+				/*(a,b) => {
+					if (!a.HasValue == b.HasValue) { return false; }
+					if (a.HasValue) {
+						if (a.Value != b.Value) {
+							return false;
+						}
+					}
+					return true;
+				});*/
+
+			}
+		}
+
+	}
+
+	////////////////////////////////////////////////////////////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////////////////////////////////////////////
+
+
+
+
 }
 
 #endif
