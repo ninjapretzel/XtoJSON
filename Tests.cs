@@ -1,5 +1,5 @@
 // Unity detection
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018
 #define UNITY
 #if UNITY_2017
 #define COMP_SERVICES
