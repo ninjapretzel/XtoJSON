@@ -34,6 +34,8 @@ I wrote it because:
 - Does not support `\u####` notation 
 - Does not like single-quotes beginning strings
 
+## Some Examples:
+
 #### One-Line Serialize and Deserialize
 - Turn Json into an object:
 ```csharp
