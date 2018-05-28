@@ -88,7 +88,7 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 1;
+	public const int MINOR = 2;
 	/// <summary> Sub-minor version Revision number </summary>
 	public const int REV = 0;
 
@@ -2471,11 +2471,14 @@ public class JsonDeserializer {
 		int startIndex = index;
 		while (index < json.Length && next != ',' && next != '}' && next != ']' && !char.IsWhiteSpace(next)) {
 			index++;
+			if (AtComment()) {
+				break;
+			}
 		}
 		string jval = json.Substring(startIndex, index - startIndex);
 
-		if (jval == "true") { return true; }
-		if (jval == "false") { return false; }
+		if (jval == "true") { return JsonBool.TRUE; }
+		if (jval == "false") { return JsonBool.FALSE; }
 		if (jval == "null") { return JsonValue.NULL; }
 
 		double dval;
@@ -2595,6 +2598,11 @@ public class JsonDeserializer {
 	internal static bool IsAlphaNum(char c) {
 		return c == '$' || c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 	}
+
+	private bool AtComment() {
+		return json[index] == '/' && (index < json.Length - 1) && json[index + 1] == '/';
+	}
+
 	/// <summary> Logic for extracting a string value from the text </summary>
 	string ProcessKey() {
 		int startIndex = -1;
@@ -2624,19 +2632,37 @@ public class JsonDeserializer {
 			endIndex = i-1;
 			index = endIndex;	
 		}
-
-
 		
 		return json.Substring(startIndex, endIndex - startIndex).TrimEnd();
 	}
 
 	/// <summary> Logic to skip over whitespace until a non whitespace character or the end of the file. </summary>
 	void SkipWhitespaceEnd() { 
-		while (index < json.Length && char.IsWhiteSpace(next)) { index++; }
+		bool comment = AtComment();
+		
+		while (comment || index < json.Length && char.IsWhiteSpace(next)) { 
+			index++; 
+			if (comment) {
+				if (next == '\n') { comment = false; }
+			} 
+			if (!comment && index < json.Length-1) {
+				
+				if (json[index] == '/' && json[index+1] == '/') { comment = true; }
+			}
+		}
 	}
 	/// <summary> Logic to skip to the next non-whitepace character </summary>
 	void SkipWhitespace() {
-		while (char.IsWhiteSpace(next)) { index++; }
+		bool comment = AtComment();
+		while (comment || char.IsWhiteSpace(next)) {
+			index++;
+			if (comment) {
+				if (next == '\n') { comment = false; }
+			}
+			if (!comment && index < json.Length-1) {
+				if (json[index] == '/' && json[index + 1] == '/') { comment = true; }
+			}
+		}
 	}
 
 

@@ -32,7 +32,7 @@ namespace JsonTests_ {
 		
 		#if UNITY_EDITOR
 		[Tooltip("This Behaviour is the Json Test Object.")]
-		public string JsonTestObject = "Last Updated 2.1.0";
+		public string JsonTestObject = "Last Updated 2.2.0";
 		public bool go = false;
 		public void Update() {
 			if (go) {
@@ -360,6 +360,7 @@ public static class JsonTests {
 						Log("\tFailure, " + type + " Failed:\n" + fail.description);
 					} else {
 						Log("\tFailure, Exception Generated: " + ex.GetType().Name);
+						Log("\t\t" + ex.Message);
 
 					}
 					Log("\tLocation: " + ex.StackTrace);
@@ -1284,6 +1285,179 @@ public static class JsonTests {
 
 	}
 
+	public static class TestComments {
+		public static void TestObjects(string[] jsonLits, JsonObject expected) {
+			for (int i = 0; i < jsonLits.Length; i++) {
+				string json = jsonLits[i].Replace('\'', '\"');
+				JsonObject value = null;
+				try {
+					value = Json.Parse<JsonObject>(json.Replace('\'', '\"'));
+					value.ShouldNotBe(null);
+					value.ShouldEqual(expected);
+
+				} catch (Exception e) {
+					throw new Exception($"Element {i} failed, json was:\n{json}\n...Failed to parse above json.\n\tparsed: {value}\n\texpected: {expected}", e);
+				}
+			}
+		}
+		public static void TestArrays(string[] jsonLits, JsonArray expected) {
+			for (int i = 0; i < jsonLits.Length; i++) {
+				string json = jsonLits[i].Replace('\'', '\"');
+				JsonArray value = null;
+				try {
+					value = Json.Parse<JsonArray>(json);
+					value.ShouldNotBe(null);
+					value.ShouldEqual(expected);
+
+				} catch (Exception e) {
+					throw new Exception($"Element {i} failed, json was:\n{json}\n...Failed to parse above json.\n\tparsed: {value}\n\texpected: {expected}", e);
+				}
+			}
+		}
+		public static void TestLineComments() {
+			string[] empties = new string[] {
+				@"{}//Comment after closing",
+				@"{} //Comment after closing",
+				
+				@"
+{ // empty object with comment inside
+}", 
+				@"//empty with comment before
+{//inside
+	//indented
+}//after
+//and far after
+",
+			};
+			JsonObject empty = new JsonObject();
+			TestObjects(empties, empty);
+
+			string[] smalls = new string[] {
+				@"{thing:'value'}//yep",
+				@"//
+{//
+//
+thing//
+//
+://
+//
+'value'//
+//
+}//
+//",
+			};
+			JsonObject small = new JsonObject("thing", "value");
+			TestObjects(smalls, small);
+		}
+
+		public static void TestLineCommentsArrays() {
+			string[] empties = new string[] {
+				@"[]//",
+				@"[] //",
+				@"//
+[//
+//
+]//
+//",		
+			};
+
+			JsonArray empty = new JsonArray();
+			TestArrays(empties, empty);
+
+			string[] smalls = new string[] {
+				@"['a','b','c',1,2,3]//Junk",
+				@"
+//
+[//begin
+'a','b','c',//letters
+1,2,3,//numbers
+
+]//and
+//done",
+				@"
+//
+[//begin
+'a','b','c',//letters
+1,2,3//numbers
+
+]//and
+//done",
+			};
+			JsonArray small = new JsonArray("a", "b", "c", 1, 2, 3);
+			TestArrays(smalls, small);
+
+		}
+		public static void TestBS() {
+
+			{
+				string data = @"
+{ // empty object with comment
+}
+".Replace('\'', '\"');
+
+				JsonObject obj = Json.Parse(data) as JsonObject;
+
+				obj.ShouldNotBe(null);
+				obj.Count.ShouldBe(0);
+			}
+
+			{
+				string data = @"
+{
+	thing: 'value', // Explanation
+}
+".Replace('\'', '\"');
+				JsonObject obj = Json.Parse(data) as JsonObject;
+
+				obj.ShouldNotBe(null);
+				obj.Count.ShouldBe(1);
+				obj["thing"].stringVal.ShouldBe("value");
+			}
+
+			{
+				string data = @"
+{
+	thing: 'value' 
+	// Explanation
+}
+".Replace('\'', '\"');
+				JsonObject obj = Json.Parse(data) as JsonObject;
+
+				obj.ShouldNotBe(null);
+				obj.Count.ShouldBe(1);
+				obj["thing"].stringVal.ShouldBe("value");
+			}
+			{
+				string data = @"
+{
+	thing: 'value',
+	// Explanation
+}
+".Replace('\'', '\"');
+				JsonObject obj = Json.Parse(data) as JsonObject;
+
+				obj.ShouldNotBe(null);
+				obj.Count.ShouldBe(1);
+				obj["thing"].stringVal.ShouldBe("value");
+			}
+
+			{
+				string data = @"
+{
+	// Explanation
+	thing: 'value' 
+}
+".Replace('\'', '\"');
+				JsonObject obj = Json.Parse(data) as JsonObject;
+
+				obj.ShouldNotBe(null);
+				obj.Count.ShouldBe(1);
+				obj["thing"].stringVal.ShouldBe("value");
+			}
+
+		}
+	}
+	
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////////////////////////////////////////////////////////////
