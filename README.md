@@ -42,7 +42,6 @@ Vector3 v = Json.To<Vector3>("{x:5,y:3,z:1}"); // (5.0, 3.0, 1.0)
 - Turn an object into Json:
 ```csharp
 Vector3 v = new Vector3(1,2,3);
-// via Extension Method
 string json = Json.ToJson(v); // {"x":1,"y":2,"z":3}
 ```
 
