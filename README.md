@@ -64,6 +64,6 @@ JsonObject obj = Json.Reflect(someObject) as JsonObject;
 JsonObject obj1 = new JsonObject(); // Empty Object
 obj["key"] = "value"; // Can use indexing syntax as dictionary
 obj["ayy"] = "lmao"; 
-foreach (var pair in obj) { /* print($"{pair.Key}: {pair.value}"); */} // Can iterate as dictionary 
+foreach (var pair in obj) { /* print($"{pair.Key}: {pair.Value}"); */} // Can iterate as dictionary 
 JsonObject obj2 = new JsonObject("key", "value", "ayy", "lmao"); // can construct via params[]
 ```
