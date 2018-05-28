@@ -90,7 +90,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 2;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 0;
+	public const int REV = 1;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -119,6 +119,14 @@ public static class Json {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		JsonValue val = jds.Deserialize();
 		return GetValue<X>(val);
+	}
+
+	/// <summary> Converts pretty much anything to a JSON string representation of itself </summary>
+	/// <param name="obj"> Value to convert to Json. </param>
+	/// <returns> Json string representation of <paramref name="obj"/>. </returns>
+	public static string ToJson(object obj) {
+		JsonValue val = Reflect(obj);
+		return val.ToString();
 	}
 
 	/// <summary> Trys to parse a json string into a JsonValue representation. 
@@ -355,7 +363,6 @@ public abstract class JsonValue {
 		if (lhs.isString || rhs.isString) { return lhs.stringVal + rhs.stringVal; }
 		return lhs.numVal + rhs.numVal;
 	}
-
 
 	/// <summary> Minus operator on JsonValues </summary>
 	/// <param name="lhs">Left Hand Side</param>

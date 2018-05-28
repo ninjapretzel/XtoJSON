@@ -1,66 +1,70 @@
 # XtoJSON
-### Press X to Jason. Oh wait, that's Heavy Rain. Oops. This is a lightweight C# Json library.
+### Json and a bit more
+Readme last updated 2.2.1
 
-Anyway, XtoJSON is, as it says, a lightweight JSON parser written in C#.  
-I wrote it after being dissapointed that System.Json isn't easily available outside of silverlight, and not liking specific things about existing JSON libraries like JSONSharp and Json.Net.
+XtoJSON is, a lightweight JSON parser written in C#.
+I wrote it because:
+- I was dissapointed that System.Json isn't easily available outside of silverlight
+- I disliked things about existing JSON libraries like JSONSharp and Json.Net.
+- I wanted more flexible parsing support
+- I wanted intermediate objects robust enough for scripting
 
-It is loosely based on the System.Json classes, as well as the JSONSharp and Json.Net libraries. Consider XtoJSON the bastard child of these three libraries.
+## Features
+- Serialize C# objects and arrays to JSON
+- Parse JSON to C# objects and arrays
+- Provides access to intermediate representations of `JsonValue`s
+	- `JsonArray` acts like `IList<JsonValue>` (Does not implement IList for fluent calls)
+	- `JsonObject` acts like `IDictionary<JsonString, JsonValue>` (same as above)
+	- Implicit conversions to and from `JsonValue` primitives make them seamless to work with
+	- Reflect data from intermediate objects into C# objects
+	- Generate intermediate objects from C# objects
+	- Construct intermediate objects procedurally (via code)
+- Parses both 'correct' and more leniant JSON styles.
+	- double quotes around 'proper' keys optional
+	- commas following last elements of collections allowed
+	- c-style line comments are allowed 
+- Can attempt to reflect values and fallback during query
+	- `JsonObject.Pull<T>(string key, T defaultValue)`
+- Can plug in arbitrary IDictionary types to use internally
+	- Need multithreading support? Assign the following on startup:
+	- `JsonObject.DictionaryGenerator = ()=>new ConcurrentDictionary<JsonString, JsonValue>();`
+	
+## Does not:
+- Does not detect circular references when serializing objects
+- Does not support `\u####` notation 
+- Does not like single-quotes beginning strings
 
 #### One-Line Serialize and Deserialize
+- Turn Json into an object:
+```csharp
+Vector3 v = Json.To<Vector3>("{x:5,y:3,z:1}"); // (5.0, 3.0, 1.0)
 ```
-//Unity Vector3
-Vector3 pos = new Vector3(1, 2, 3);
-string posJson = Json.Serialize(pos);
-//Gives us: {
-//	"x":1,
-//	"y":2,
-//	"z":3
-//}
-Vector3 dePos = Json.Deserialize<Vector3>(posJson);
-//gives us: (1.0, 2.0, 3.0)
+- Turn an object into Json:
+```csharp
+Vector3 v = new Vector3(1,2,3);
+// via Extension Method
+string json = Json.ToJson(v); // {"x":1,"y":2,"z":3}
 ```
 
-
-#### Sample Code: 
+#### Intermediate Representations
+- Turn Json into intermediate JsonObject
+```csharp
+// Multiple ways,
+// Direct parse and interpret with as or cast...
+JsonObject obj1 = Json.Parse("{x:5,y:3,z:1}") as JsonObject;
+JsonObject obj2 = (JsonObject) Json.Parse("{x:5,y:3,z:1}");
+// Generic parse
+JsonObject obj3 = Json.Parse<JsonObject>("{x:5,y:3,z:1}");
 ```
-JsonObject obj = new JsonObject()
-    .Add("name", "Bobby")
-    .Add("class", "warrior")
-    .Add("hp", 50)
-    .Add("dead", false);
-Console.WriteLine(obj.PrettyPrint());
-Gives us the json:
-{
-    "name":"Bobby",
-	"class":"warrior",
-	"hp":50,
-	"dead":false
-}
+- Turn any object into intermediate JsonObject
+```csharp
+JsonObject obj = Json.Reflect(someObject) as JsonObject;
 ```
-
-### Features :
- * Serialize C# objects to JSON
- * Serializes objects as arrays that provide an indexer with an int index (this[int blah]) and int 'Count' properties
- * Serializes objects that provide an indexer with a string index (this[string blah]) and IEnumerable<string> 'Keys' properties
- * Serializes objects recusively, and as extensively as possible.
- * **BE WARNED: ANY OBJECT WITH LOOPING REFERENCES (ex CIRCULAR LISTS with last pointint to first ) WILL NOT TERMINATE SERIALIZATION (INFINITE LOOP)**
- * Deserialize JSON into internal JsonValue classes
- * Reflect information stored in a JsonObject into an arbitrary object.
- * Construct JSON objects/arrays from scratch (via code)
- * Query and Modify JavaScript-like objects and arrays
- * Implicit conversions from C# primitives to JsonValue types
- * Explicit conversions from JsonValue types back to primitives
- * Easy, quick to write syntax
-
-### Classes:
- * Json - Quick access to JsonReflector and JsonDeserializer.
- * JsonValue - Base class for everything
- * JsonValueCollection - Base class for objects/arrays
- * JsonBool - Boolean primitive
- * JsonNumber - Double primitive
- * JsonString - String primitive
- * JsonObject - Functions like a Dictionary< string, JsonValue >
- * JsonArray - Functions like a List< JsonValue >
- * JsonReflector - Reflects an object's primitive fields. Used by Json.Reflect()
- * JsonDeserializer - Class that deserializes json strings. Used by Json.Parse()
-
+- Construct and manipulate intermediate JsonObject
+```csharp
+JsonObject obj1 = new JsonObject(); // Empty Object
+obj["key"] = "value"; // Can use indexing syntax as dictionary
+obj["ayy"] = "lmao"; 
+foreach (var pair in obj) { /* print($"{pair.Key}: {pair.value}"); */} // Can iterate as dictionary 
+JsonObject obj2 = new JsonObject("key", "value", "ayy", "lmao"); // can construct via params[]
+```
