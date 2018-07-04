@@ -13,7 +13,7 @@ using UnityEngine;
 
 public class Example : MonoBehaviour {
 	void Start() {
-		JsonTests.RunTests();
+		Json_Tests.RunTests();
 
 	}
 }

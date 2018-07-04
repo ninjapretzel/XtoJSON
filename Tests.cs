@@ -38,7 +38,7 @@ namespace JsonTests_ {
 			if (go) {
 				go = false;
 				
-				Debug.Log(JsonTests.RunTests());
+				Debug.Log(Json_Tests.RunTests());
 
 			}
 		}
@@ -51,7 +51,7 @@ namespace JsonTests_ {
 
 #if DEBUG
 /// <summary> Class containing a small suite of tests to ensure all functionality is good. </summary>
-public static class JsonTests {
+public static class Json_Tests {
 	#region Test Framework
 	// ~180 lines to get most of Shouldly's functionality.
 	#region shouldly-like-extensions
@@ -312,7 +312,7 @@ public static class JsonTests {
 	}
 
 	private static MethodInfo[] GetTestMethods() {
-		return (typeof(JsonTests)).GetTestMethods().ToArray();
+		return (typeof(Json_Tests)).GetTestMethods().ToArray();
 	}
 	
 
