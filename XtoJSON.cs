@@ -1499,7 +1499,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 //JsonArray
 
 /// <summary> Representation of an array of objects </summary>
-public class JsonArray : JsonValue, IEnumerable<JsonValue> {
+public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 
 	/// <summary>
 	/// Parses a standard CSV-format spreadsheet into a JsonArray.
@@ -1561,6 +1561,15 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 	public override JsonType JsonType { get { return JsonType.Array; } }
 	/// <inheritdoc />
 	public override int Count { get { return list.Count; } }
+
+	int ICollection<JsonValue>.Count { get { return Count; } }
+
+	bool ICollection<JsonValue>.IsReadOnly { get { return false; } }
+
+	JsonValue IList<JsonValue>.this[int index] { 
+		get { return this[(JsonValue)index]; }	
+		set { this[(JsonValue)index] = value; }
+	}
 
 	/// <summary> Index this JsonArray with a given JsonValue. Integers are preferred, but any value will be converted to an integer and then used. </summary>
 	/// <param name="index"> Index to check at </param>
@@ -1931,6 +1940,41 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue> {
 		return new JsonPrettyPrinter().PrettyPrint(this).ToString();
 	}
 
+	int IList<JsonValue>.IndexOf(JsonValue item) {
+		return list.IndexOf(item);
+	}
+
+	void IList<JsonValue>.Insert(int index, JsonValue item) {
+		list.Insert(index, item);
+	}
+
+	void IList<JsonValue>.RemoveAt(int index) {
+		list.RemoveAt(index);
+	}
+
+	void ICollection<JsonValue>.Add(JsonValue item) {
+		list.Add(item);
+	}
+
+	void ICollection<JsonValue>.Clear() {
+		list.Clear();
+	}
+
+	bool ICollection<JsonValue>.Contains(JsonValue item) {
+		return list.Contains(item);
+	}
+
+	void ICollection<JsonValue>.CopyTo(JsonValue[] array, int arrayIndex) {
+		list.CopyTo(array, arrayIndex);
+	}
+
+	bool ICollection<JsonValue>.Remove(JsonValue item) {
+		return list.Remove(item);
+	}
+
+	IEnumerator<JsonValue> IEnumerable<JsonValue>.GetEnumerator() {
+		return list.GetEnumerator();
+	}
 }
 
 #endregion
@@ -3065,6 +3109,37 @@ public static class JsonOperations {
 		return source;
 	}
 
+	public static JsonValue Xpath(this JsonValue src, string path) {
+		if (src != null) {
+			JsonValue trace = src;
+			String[] jumps = path.Split('.', '/');
+			//try {
+			foreach (string jump in jumps) {
+				if (trace.isObject || trace.isArray) {
+					trace = trace[jump];
+				}
+			}
+			return trace;
+			//}
+		}
+		return JsonNull.instance;
+	}
+
+	public static T XPath<T>(this JsonValue src, string path) where T : JsonValue {
+		if (src != null) {
+			JsonValue trace = src;
+			String[] jumps = path.Split('.', '/');
+			//try {
+			foreach (string jump in jumps) {
+				if (trace.isObject || trace.isArray) {
+					trace = trace[jump];
+				}
+			}
+			return trace as T;
+			//}
+		}
+		return null;
+	}
 }
 #endregion
 
@@ -3096,6 +3171,8 @@ namespace XtoJSON {
 		public static JsonValue ReflectJson(this object obj) { return Json.Reflect(obj); }
 		/// <summary> More formal name for Reflect() </summary>
 		public static JsonValue SerializeJson(this object obj) { return Json.Reflect(obj); }
+
+
 	}
 
 }
