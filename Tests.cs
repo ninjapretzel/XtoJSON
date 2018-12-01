@@ -1007,7 +1007,9 @@ public static class Json_Tests {
 				JsonArray b = new JsonArray().Add("Heeeello").Add("nurse").Add(42);
 				JsonArray c = new JsonArray().Add("yes").Add("no").Add("maybe").Add("could you repeat the question?");
 
+				// .Equals
 				a.ShouldEqual(b);
+				// ==
 				a.ShouldNotBe(b);
 				a.ShouldNotBe(c);
 				a.ShouldNotEqual(c);
@@ -1015,6 +1017,61 @@ public static class Json_Tests {
 			}
 		}
 	}
+
+	/// <summary> Tests for non-standard json features, other than comments. </summary>
+	public static class TestJsonExt { 
+		
+		public static void TestObjectSetParse() {
+			{
+				string raw = @"
+{
+	a, b, c, one, two, three,
+}".Replace('\'', '\"');
+
+				JsonObject parsed = Json.Parse<JsonObject>(raw);
+
+				parsed.Count.ShouldBe(6);
+				parsed.Get<bool>("a").ShouldBe(true);
+				parsed.Get<bool>("b").ShouldBe(true);
+				parsed.Get<bool>("c").ShouldBe(true);
+				parsed.Get<bool>("one").ShouldBe(true);
+				parsed.Get<bool>("two").ShouldBe(true);
+				parsed.Get<bool>("three").ShouldBe(true);
+
+				JsonObject expected = new JsonObject("a", true, "b", true, "c", true, "one", true, "two", true, "three", true);
+
+				parsed.ShouldEqual(expected);
+
+			}
+		}
+
+		public static void TestArraySetParse() {
+			{
+				string raw = @"
+[
+	a, b, c, one, two, three
+]
+".Replace('\'', '\"');
+
+				JsonArray parsed = Json.Parse<JsonArray>(raw);
+
+				parsed.Count.ShouldBe(6);
+				parsed.Get<string>(0).ShouldBe("a");
+				parsed.Get<string>(1).ShouldBe("b");
+				parsed.Get<string>(2).ShouldBe("c");
+				parsed.Get<string>(3).ShouldBe("one");
+				parsed.Get<string>(4).ShouldBe("two");
+				parsed.Get<string>(5).ShouldBe("three");
+
+				JsonArray expected = new JsonArray("a", "b", "c", "one", "two", "three");
+
+				parsed.ShouldEqual(expected);
+
+			}
+		}
+
+	}
+
 	/// <summary> Test holding General JsonValue test functions </summary>
 	public static class TestGeneral {
 		public static void TestEscapes() {
