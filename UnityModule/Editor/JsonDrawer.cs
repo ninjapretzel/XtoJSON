@@ -1,4 +1,4 @@
-#if UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018
+#if UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019
 #define UNITY
 #endif
 #if UNITY
@@ -95,6 +95,16 @@ public static class JsonDrawer {
 	public static Color ModColor(int i) {
 		i = (i < 0) ? -i : i;
 		return nestColors[i % nestColors.Length];
+	}
+
+	public static bool DrawSolo(JsonValue live, string label = "Json") {
+		if (live != null) {
+			return Draw(live, label);
+		} else {
+			GUILayout.Label(label);
+			GUILayout.Label("Nothing to draw");
+		}
+		return false;
 	}
 
 	public static string DrawLive(string serialized, ref JsonValue live, string label = "Json") {
@@ -218,7 +228,7 @@ public static class JsonDrawer {
 			else { toggledPaths.Add(path); }
 		};
 		
-		// These may use eachother, so we have to declare them before we bind to them.
+		// These may use eachother recursively., so we have to declare them before we bind to them.
 		Action<JsonValue, JsonValue, JsonValue> drawField = null;
 		Action<JsonValue, JsonObject> drawJsonObject = null;
 		Action<JsonValue, JsonArray> drawJsonArray = null;
