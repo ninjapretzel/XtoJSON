@@ -97,7 +97,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 2;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 1;
+	public const int REV = 2;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -195,11 +195,9 @@ public static class Json {
 		JsonValue val = Reflect(o);
 		return GetValue<T>(val);
 	}
-
-	/// <summary> Get the expected type of the reflection of a code object. </summary>
-	public static JsonType ReflectedType(object o) {
-		if (o == null) { return JsonType.Null; }
-		Type t = o.GetType();
+	
+	/// <summary> Get the expected reflected <see cref="JsonType"/> of a given <see cref="Type"/></summary>
+	public static JsonType ExpectedReflectedType(Type t) {
 		if (t == typeof(string)) { return JsonType.String; }
 		if (t == typeof(bool)) { return JsonType.Boolean; }
 		if (t.IsNumeric()) { return JsonType.Number; }
@@ -208,6 +206,13 @@ public static class Json {
 		if (t.IsArray) { return JsonType.Array; }
 
 		return JsonType.Object;
+	}
+
+	/// <summary> Get the expected type of the reflection of a code object. </summary>
+	public static JsonType ReflectedType(object o) {
+		if (o == null) { return JsonType.Null; }
+		Type t = o.GetType();
+		return ExpectedReflectedType(t);
 	}
 
 
@@ -1103,6 +1108,14 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <param name="key"> Name of property to check. </param>
 	/// <returns> True if property exists, false otherwise. </returns>
 	public bool Has(string key) { return data.ContainsKey(key); }
+
+	/// <summary> Does this object have a property defined as <paramref name="key"/> that matches <typeparamref name="T"/>? </summary>
+	/// <typeparam name="T"> JsonValue based type to match </typeparam>
+	/// <param name="key"> Key to check </param>
+	/// <returns> true if <paramref name="key"/> exists, and matches the given type, otherwise false </returns>
+	public bool Has<T>(string key) where T : JsonValue {
+		return Has(key) && this[key].GetType() == typeof(T);
+	}
 	/// <summary> Does this object contain all of the given keys? </summary>
 	/// <param name="keys"> Array of keys to check </param>
 	/// <returns> True if this object has all of the keys, false otherwise </returns>
@@ -1242,6 +1255,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 
 			if (typeof(T) == val.GetType()) { return (T)(object)val; }
 			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
+			if (val.JsonType == Json.ExpectedReflectedType(typeof(T))) {return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
 	}
