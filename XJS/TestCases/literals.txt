@@ -1,0 +1,30 @@
+
+var arr = []
+Debug.Log(arr)
+arr.Add("hey");
+arr.Add("yo");
+arr.Add(5);
+arr.Add(4);
+arr.Add(3);
+arr.Add(2);
+arr.Add(1);
+arr.Add(0);
+arr.Add();
+
+Debug.Log(arr)
+//Debug.Log(arr[1]);
+
+var arr2 = [ 1, 2, 3 ]
+Debug.Log(arr2)
+Debug.Log(arr2[1]);
+
+var obj = {}
+obj.x = 1
+obj.y = 2
+obj.z = 3
+Debug.Log(obj);
+
+var obj2 = { x: 4, y: 5, z: 6 }
+Debug.Log(obj2);
+
+return arr;

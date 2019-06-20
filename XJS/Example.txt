@@ -1,0 +1,114 @@
+var someVar = "some string";
+var test = func()=>{
+	// This invokes the UnityEngine.Debug.Log function
+	Debug.Log("Test");
+};
+var something = {};
+var nothing = null;
+// test();
+
+var x = func(a, b, c) => {
+	var s = "strings " + a + " getting " + b + " concatenated " + c;
+	Debug.Log(s); 
+	return s;
+};
+
+// Debug.Log( "and more " + x(1,2,3) );
+
+var str = "ayy" + " " + "lmao" + " " 
+		+ " yer " + " " + "so" + " " + "cool";
+Debug.Log(str);
+
+//Should optimize to:
+//var str = "ayy lmao yer so cool"
+
+var str2 = "no // this is not a comment"; // but this is 
+/* block
+comment
+should
+get
+"" removed" " */
+// Keep this line at 31 and the next at 32
+var str3 = "this is source line 32"; // Or update line numbers!
+
+// Function does not exist, so it should resolve to null
+//var a = NonExistant.funct();
+//Debug.Log("a: " + a);
+//var b = NonExistant.field;
+//Debug.Log("b: " + b);
+/*
+
+c1 = 1 + 2 + a * b + 55;
+// Should optimize to:
+// c1 = 58 + a * b;
+
+c2 = 1 + 2 + a * b + 55 + counter();
+// Should optimize to:
+// c2 = 58 + a * b + counter()
+
+c3 = 1 + 2 - 3 + 4 - 5 + 6 - 7 + 8;
+// Should optimize to: 
+// c3 = 6;
+
+
+c4 = (10 + 5) * 3 + 5;
+// Should optimize to 
+// c4 = 50
+
+c4++;
+c4 += 5;
+
+
+if (c > 50) { 
+	Debug.Log("omg fam");
+} else {
+	Debug.Log("smh fam");
+}
+//*/
+
+// loops.
+for (var i = 0; i < 10; i++) { Debug.Log("Loops! " + i); }
+
+// Eventually array literals should work, but not yet. 
+// var arr = [ "first", "second", "third" ]
+var arr = []
+arr.Add("first")
+arr.Add("second")
+arr.Add("third")
+return arr;
+/*
+// each will loop through all items in the array.
+each (item in arr) { Debug.Log(item); }	
+
+// while loops while a condition is true
+// this should add two 'yep's to arr
+while (arr.Count < 5) { arr.Add("yep"); }
+
+// And this should add at least one 'thing' to arr
+// even though the condition is not true 
+do { arr.Add("thing"); } while (arr.Count < 0) 
+*/
+
+// Some unlabeled loop breaks
+/*
+for (var x = 0; x < 10; x++) {
+	if (SomeFunc(x)) { break }
+}
+xx = 0;
+while (xx < 10) { if (SomeFunc(x)) { break; } x++; }
+*/
+// Lets label some loops:
+
+/*
+:outer: for (var y = 0; y < 10; y++) {
+	for (var x = 0; x < 10; x++) {
+		Debug.Log("at " + x + " " + y);
+		if (SomeData.Get(x, y) == 50) {
+			break :outer:
+		}
+	}
+}
+// */
+
+//See if it can handle compactly formatted code
+//xx=0;yy=0:secondouter:while(xx<10){while(yy<10){if(SomeData.Get(x,y)==50){continue:secondouter:}yy++;}xx++}

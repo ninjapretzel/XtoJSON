@@ -1,0 +1,169 @@
+/* 
+JS-like Grammar
+
+Key:
+	* = Previous item repeated 0 or more times (must come right after an element, no space)
+			{{ x* y }} applies the * rule to 'x' and then requires a 'y'
+			{{ x * y }} requires an 'x', a '*', and then a 'y'
+
+	? = Previous item is optional (0 or 1 times)  ( same rules as above for '*' )
+
+	| = OR (DOES NOT NEED TO COME RIGHT AFTER/BEFORE ANYTHING. 
+			{{ x|y|z }} is equivalant to {{ x | y | z }}
+			Only applies outside of [[]] groups. Ex [[ & | ^ ]] means require a '&', '|' or '^' character
+
+	{{}} = group everything inside, in order
+		{{ A | {{ B B }} | C | D }} means choose from 'A', 'BB', 'C', or 'D'
+		{{ A B C D }}? means 'A' following 'B' following 'C' following 'D' is optional (0 or 1 time)
+
+	[[]] = select one from inside 
+		[[x y z]] is shorthand for {{x | y | z}}
+		[[ xx yy zz ]] is shorthand for [[ {{ x x }} {{ y y }} {{ z z }} ]]
+		
+	// = Comment (Ignored) (C-style slash-start --- star-slash block comments are also ignored.
+
+	/regex/ = RegEx
+
+	<XYZ> = apply rule XYZ
+
+Grammar rules are specified by the pattern
+	
+	<RULE>	=>	<X> fixed : <Y> keywords and mods { <Z>* } or symbols
+
+		(Each rule's right-hand side of => has an implicit {{ }} context.)
+
+*/
+
+// Specifies starting point.
+<ROOT> = <PROG>
+
+
+<PROG>				=>	<IM_EX_PORTS>? <STATEMENTS>
+
+<IM_EX_PORTS>		=>	{{ <IMPORT> <EXPORT> }}*
+
+<IMPORT>			=>	import <PATH> ;
+<EXPORT>			=>	export <PATH> ;
+
+<PATH>				=>	<NAME> {{ . <NAME> }}*
+<NAME>				=>	/[a-zA-Z_\$][a-zA-Z0-9_\$]*/
+
+<STATEMENTS>		=>	<STMT>*
+
+<STMT>				=>	[[
+							<IF-STMT>
+
+							<FOR-STMT>
+							<EACH-STMT>
+							<WHILE-STMT>
+							<DO-WHILE-STMT>
+
+							<BREAK-STMT>
+							<CONTINUE-STMT>
+
+							<RETURN-STMT>
+						
+							<DEC-STMT>
+							<ASN-STMT>
+							<PRE-POST-INC-DEC>
+
+							<FUNC-CALL>
+							<LABEL>
+							<CODE-BLOCK>
+							;
+					]]
+
+<CODE-BLOCK>		=>	{ <STATEMENTS> }
+<LABEL>				=>	:<NAME>:
+
+<IF-STMT>			=>	if ( <EXPR> ) <STMT> <ELSE>?
+<ELSE>				=>	else <STMT>
+
+<FOR-STMT>			=>	<LABEL>? for	( <FOR-INIT>? ; <FOR-COND>? ; <FOR-INCR>? ) <STMT>
+<FOR-INIT>			=>	<DEC-STMT> | <ASN-STMT>
+<FOR-COND>			=>	<BOOL-EXPR>
+<FOR-INCR>			=>	<ASN-STMT> | <PRE-POST-INC-DEC>
+
+<EACH-STMT>			=>	<LABEL>? each ( <NAME> in <PATH> ) <STMT> 
+
+<WHILE-STMT>		=>	<LABEL>? while ( <BOOL-EXPR> ) <STMT>
+<DO-WHILE-STMT>		=>	<LABEL>? do <STMT> while ( <BOOL-EXPR> )
+
+<RETURN-STMT>		=>	return <EXPR> | ;
+
+<BREAK-STMT>		=>	break <LABEL>?
+<CONTINUE-STMT>		=>	continue <LABEL>?
+
+
+
+<DEC-STMT>		=>	var <NAME> {{ <=> <EXPR> }}?
+<ASN-STMT>			=>	{{ [[ <PATH> <ARR-INDEX> ]] <=> <EXPR> }} 
+<PRE-POST-INC-DEC>	=>	[[
+							{{ ++ [[ <PATH> <ARR-INDEX> ]] }}
+							{{ -- [[ <PATH> <ARR-INDEX> ]] }}
+							{{ [[ <PATH> <ARR-INDEX> ]] ++ }}
+							{{ [[ <PATH> <ARR-INDEX> ]] -- }}
+						]]
+
+<=>					=>	[[ += -= *= /= %= ^= &= |= <<= >>= = ]]
+
+<EXPR>				=>	[[
+							<BOOL-EXPR>
+							<ARITH-EXPR>
+							<TYPE-EXPR>
+							<IS-EXPR>
+							{{ ( <EXPR> ) }}
+						]]
+
+<BOOL-EXPR>			=>	<BOOL-TERM> {{ [[ || ]] <BOOL-TERM> }}?
+<BOOL-TERM>			=>	<BOOL-FACT> {{ [[ && ]] <BOOL-FACT> }}?
+<BOOL-FACT>			=>	[[ 
+							{{ <ARITH-EXPR> [[ < > == != <= >= ]] <ARITH-EXPR> }}
+							{{ ! <BOOL-EXPR> }}
+							{{ <ATOM> }}
+						]]
+
+<ARITH-EXPR>		=>	<ARITH-TERM> {{ [[ + - ]] <ARITH-TERM> }}?
+<ARITH-TERM>		=>	<ARITH-FACT> {{ [[ * / % ]] <ARITH-FACT> }}?
+<ARITH-FACT>		=>	<ATOM> | {{ - <ARITH-FACT> }} | {{ ( <EXPR> ) }}
+
+
+<TYPE-EXPR>			=>	typeof <EXPR>
+<IS-EXPR>			=>	<EXPR> is <EXPR>
+
+<TERNARY-EXPR>		=>	<BOOL-EXPR> ? <EXPR> : <EXPR>
+
+<FUNC-CALL>			=>	<PATH> ( <PARAM-LIST>? )
+<PARAM-LIST>		=>	<EXPR> {{ , <EXPR> }}*
+
+<ATOM>				=>	[[
+							<PATH>		// Variable ID/location
+							<FUNC-CALL>	// PATH followed by (
+							<ARR-INDEX>	// PATH followed by [
+							<ASN-STMT>	// PATH followed by <=>
+							<NUMBER>	// !NUMBER token
+							<STRING>	// !STRING token
+							true		// keyword
+							false		// keyword
+							null		// keyword
+							<LAMBDA>	// begins with func keyword
+							<OBJ>		// immediate {
+							<ARR>		// immediate [
+						]]
+
+<ARR-INDEX>			=>	<PATH> [ <EXPR> ]
+
+<NUMBER>			=>	/(0x[0-9A-Fa-f]+[lL]?)|(\d+\.\d*[fF]?)|(\d*\.\d+[fF]?)(0x[0-9A-Fa-f]+[lL]?)|(\d+[lL]?)|(\d+\.\d*[fF]?)|(\d*\.\d+[fF]?)/
+<STRING>			=>	{{ ' /.*/ ' }} | {{ " /.*/ " }} // Loose definition, specifics are different. 
+
+<OBJ>				=>	{ } // MORE TO BE DONE LATER
+<ARR>				=>	[ ] // MORE TO BE DONE LATER
+
+<LAMBDA>			=>	[[
+							// Currently, func keyword is required. Eventually I want a good enough deferral 
+							// That can allow it to be optional. Currently it would require rolling back the tokenizer's state.
+							{{ func? ( <VAR-LIST>? ) [[ => -> ]]? <STMT> }} // Can use => or -> rockets to preference.
+							{{ func? ( <VAR-LIST>? ) [[ => -> ]] EXPR }} // Rockets are required for expressions by themselves. 
+						]]
+
+<VAR-LIST>			=>	<NAME> {{ , <NAME> }}*

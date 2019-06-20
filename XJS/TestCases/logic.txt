@@ -1,0 +1,11 @@
+var one = func()=>{ return "first lambda"; }
+var two = func()=>{ return "second lambda" }
+for (var i = 0; i < 10; i++) {
+	if (i < 5) {
+		Debug.Log(i + " is Less than 5. " + one() );
+	} else if (i == 5) {
+		Debug.Log(i + " ! " + two() );
+	} else {
+		Debug.Log(i + " is bigger than 5! " + one() );
+	}
+}

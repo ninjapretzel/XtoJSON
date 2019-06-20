@@ -1,0 +1,10 @@
+// Following should parse as valid
+import x.y.z as eckswhyzee;
+import a.b.c as OneTwoThree;
+import literally as who;
+import everything;
+
+// Semicolons not required.
+import you; import me import bob import saget
+
+return "it werked"

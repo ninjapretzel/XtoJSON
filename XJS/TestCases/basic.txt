@@ -1,0 +1,4 @@
+
+var x = "some value";
+
+Debug.Log(x);

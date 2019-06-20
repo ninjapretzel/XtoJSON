@@ -1,0 +1,8 @@
+
+var i = 0;
+
+i--;
+i--;
+i--;
+
+Debug.Log(i);
