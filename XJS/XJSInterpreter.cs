@@ -378,14 +378,17 @@ public partial class XJS {
 			return new JsonFunction((theThis, context, prams) => {
 				// Create a new frame with the applied context and this 
 				Frame next = new Frame(theThis, context);
-				// Push initial scope block into stackframe 
 				next.Push();
+				// Push initial scope block into stackframe 
 				for (int i = 0; i < varlist.DataListed; i++) {
+					var paramName = varlist.Data(i);
+					Dbg($"Setting param {paramName} to {prams[i]}");
 					// Copy vars into initial scope (they are assumed to line up)
-					next[varlist.Data(i)] = prams[i];
+					next[paramName] = prams[i];
 				}
-				// Push stackframe onto stack 
-				frames.Push(frame);
+				next.Push();
+				// Push stackframe onto stack
+				frames.Push(next);
 
 				// Execute function body 
 				JsonValue result = Execute(body);
@@ -662,17 +665,20 @@ public partial class XJS {
 							JsonArray prams = new JsonArray();
 
 							for (int i = 0; i < funcCallParams.NodesListed; i++) {
+								Dbg($"Executing FUNCCALL {target} parameter {i}");
 								JsonValue pram = Execute(funcCallParams.Child(i));
 								prams.Add(pram);
 							}
 
-							// JsonFunction func = GetAtPath(target) as JsonFunction;
-							object targetObject = TracePath(target);
+							JsonFunction func = GetAtPath(target) as JsonFunction;
+							if (func == null) {
+								object targetObject = TracePath(target);
 							
-							string funcName = (target.Contains(".")) 
-								? target.Substring(target.LastIndexOf('.')+1)
-								: target; 
-							JsonFunction func = DoGet(targetObject, funcName) as JsonFunction;
+								string funcName = (target.Contains(".")) 
+									? target.Substring(target.LastIndexOf('.')+1)
+									: target; 
+								func = DoGet(targetObject, funcName) as JsonFunction;
+							}
 
 							
 							// The function will take care of adding a frame if it needs it.

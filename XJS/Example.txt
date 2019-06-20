@@ -5,7 +5,7 @@ var test = func()=>{
 };
 var something = {};
 var nothing = null;
-// test();
+test();
 
 var x = func(a, b, c) => {
 	var s = "strings " + a + " getting " + b + " concatenated " + c;
@@ -13,7 +13,7 @@ var x = func(a, b, c) => {
 	return s;
 };
 
-// Debug.Log( "and more " + x(1,2,3) );
+Debug.Log( "and more " + x(1,2,3) );
 
 var str = "ayy" + " " + "lmao" + " " 
 		+ " yer " + " " + "so" + " " + "cool";
