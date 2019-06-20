@@ -341,6 +341,42 @@ public partial class XJS {
 
 		}
 
+		/// <summary> Turns a node into a JsonFunction that can be executed. </summary>
+		/// <param name="funcNode"> Node holding program tree to execute </param>
+		/// <returns> JsonFunction bound to nothing, which executes the given Program tree as its body. </returns>
+		public JsonFunction MakeFunction(Node funcNode) {
+			Node varlist = funcNode.Child("varlist");
+			Node body = funcNode.Child("codeblock");
+
+			return new JsonFunction((theThis, context, prams) => {
+				// Create a new frame with the applied context and this 
+				Frame next = new Frame(theThis, context);
+				// Push initial scope block into stackframe 
+				next.Push();
+				for (int i = 0; i < varlist.DataListed; i++) {
+					var paramName = varlist.Data(i);
+					//Dbg($"Setting param {paramName} to {prams[i]}");
+					// Copy vars into initial scope (they are assumed to line up)
+					next.Declare(paramName, prams[i]);
+					//Dbg(""+next);
+				}
+				next.Push();
+				// Push stackframe onto stack
+				frames.Push(next);
+
+				// Execute function body 
+				//Dbg($"Before\n{frame}");
+				JsonValue result = Execute(body);
+				//Dbg($"After\n{frame}");
+				// Pop stackframe from stack 
+				frames.Pop();
+
+				// Return result 
+				return result;
+			});
+
+		}
+
 		private static readonly object[] EMPTY_ARGS = new object[0];
 
 		const BindingFlags ANY_INSTANCE = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -376,42 +412,6 @@ public partial class XJS {
 			}
 			
 			global[type.Name] = typeRep;
-		}
-
-		/// <summary> Turns a node into a JsonFunction that can be executed. </summary>
-		/// <param name="funcNode"> Node holding program tree to execute </param>
-		/// <returns> JsonFunction bound to nothing, which executes the given Program tree as its body. </returns>
-		public JsonFunction MakeFunction(Node funcNode) {
-			Node varlist = funcNode.Child("varlist");
-			Node body = funcNode.Child("codeblock");
-
-			return new JsonFunction((theThis, context, prams) => {
-				// Create a new frame with the applied context and this 
-				Frame next = new Frame(theThis, context);
-				// Push initial scope block into stackframe 
-				next.Push();
-				for (int i = 0; i < varlist.DataListed; i++) {
-					var paramName = varlist.Data(i);
-					//Dbg($"Setting param {paramName} to {prams[i]}");
-					// Copy vars into initial scope (they are assumed to line up)
-					next.Declare(paramName, prams[i]);
-					//Dbg(""+next);
-				}
-				next.Push();
-				// Push stackframe onto stack
-				frames.Push(next);
-
-				// Execute function body 
-				//Dbg($"Before\n{frame}");
-				JsonValue result = Execute(body);
-				//Dbg($"After\n{frame}");
-				// Pop stackframe from stack 
-				frames.Pop();
-
-				// Return result 
-				return result;
-			});
-
 		}
 
 		public static BinaryOp ADD_OP = (lhs, rhs) => { return lhs + rhs; };
