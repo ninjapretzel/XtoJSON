@@ -4,6 +4,7 @@ using System.Collections.Generic;
 
 using static XJS.Nodes;
 using System.Reflection;
+using Lib;
 
 public partial class XJS {
 
@@ -84,6 +85,15 @@ public partial class XJS {
 			/// <summary> Removes the 'top' scope block. </summary>
 			public void Pop() { RemoveAt(Count-1); }
 
+
+			public override string ToString() {
+				StringBuilder str = "";
+				str = str + $"Base: {baseContext}";
+				for (int i = 0; i < Count; i++) {
+					str = str + $"\nFrame[{i}]: {this[i]}";
+				}
+				return str.ToString();
+			}
 		}
 
 		/// <summary> The global object reference. Always available, via 'global.xyz' </summary>
@@ -197,7 +207,7 @@ public partial class XJS {
 
 			}
 
-			Dbg($"DoGet: Attempting to reflect {key} on {obj.GetType()}.");
+			//Dbg($"DoGet: Attempting to reflect {key} on {obj.GetType()}.");
 			// Attempt to reflect value from object
 			Type type = obj.GetType();
 			MethodInfo methodCheck = type.GetMethod(key, PUBLIC_INSTANCE);
@@ -378,20 +388,23 @@ public partial class XJS {
 			return new JsonFunction((theThis, context, prams) => {
 				// Create a new frame with the applied context and this 
 				Frame next = new Frame(theThis, context);
-				next.Push();
 				// Push initial scope block into stackframe 
+				next.Push();
 				for (int i = 0; i < varlist.DataListed; i++) {
 					var paramName = varlist.Data(i);
-					Dbg($"Setting param {paramName} to {prams[i]}");
+					//Dbg($"Setting param {paramName} to {prams[i]}");
 					// Copy vars into initial scope (they are assumed to line up)
-					next[paramName] = prams[i];
+					next.Declare(paramName, prams[i]);
+					//Dbg(""+next);
 				}
 				next.Push();
 				// Push stackframe onto stack
 				frames.Push(next);
 
 				// Execute function body 
+				//Dbg($"Before\n{frame}");
 				JsonValue result = Execute(body);
+				//Dbg($"After\n{frame}");
 				// Pop stackframe from stack 
 				frames.Pop();
 
@@ -665,7 +678,7 @@ public partial class XJS {
 							JsonArray prams = new JsonArray();
 
 							for (int i = 0; i < funcCallParams.NodesListed; i++) {
-								Dbg($"Executing FUNCCALL {target} parameter {i}");
+								//Dbg($"Executing FUNCCALL {target} parameter {i}");
 								JsonValue pram = Execute(funcCallParams.Child(i));
 								prams.Add(pram);
 							}
@@ -679,10 +692,10 @@ public partial class XJS {
 									: target; 
 								func = DoGet(targetObject, funcName) as JsonFunction;
 							}
-
 							
 							// The function will take care of adding a frame if it needs it.
 							JsonValue result = func?.Invoke(global, prams);
+							//Dbg($"Invoking function {target} got {{{result}}}");
 
 							// If we got a return value, reset it to null to stop popping frames.
 							returnValue = null;
