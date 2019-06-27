@@ -7,7 +7,16 @@ using System.Linq;
 
 /// <summary> Container class for XJS language </summary>
 public static partial class XJS {
-	
+
+	/// <summary> Parses program text into a tree representing the program </summary>
+	/// <param name="script"> Text of program to parse </param>
+	/// <returns> Node holding entire parsed program tree </returns>
+	public static Node Parse(string script) {
+		script = XJSHelpers.StripCStyleComments(script);
+		Tokenizer tokenizer = new Tokenizer(script);
+		return ParseProgram(tokenizer);
+	}
+
 	#region Constant type stuff 
 	/// <summary> Keywords of the language </summary>
 	public static readonly string[] keywords = {
