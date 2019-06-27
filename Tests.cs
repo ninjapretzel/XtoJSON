@@ -816,11 +816,11 @@ namespace JsonTests {
 
 					string pp = obj.PrettyPrint();
 					string expectedPrettyPrint = @"{
-		'x':5,
-		'y':20,
-		'str':'someString',
-		'z':false
-	}".Replace('\'', '\"');
+	'x':5,
+	'y':20,
+	'str':'someString',
+	'z':false
+}".Replace('\'', '\"');
 
 					pp.ShouldBe<string>(expectedPrettyPrint);
 
@@ -843,16 +843,16 @@ namespace JsonTests {
 
 					string pp = obj.PrettyPrint();
 					string expectedPrettyPrint = @"{
-		'x':
+	'x':
+	{
+		'y':
 		{
-			'y':
+			'z':
 			{
-				'z':
-				{
-				}
 			}
 		}
-	}".Replace('\'', '\"');
+	}
+}".Replace('\'', '\"');
 					pp.ShouldBe<string>(expectedPrettyPrint);
 
 					JsonObject strParse = Json.Parse(str) as JsonObject;
@@ -965,13 +965,13 @@ namespace JsonTests {
 
 					string strExpected = "[1,2,3,4,5,6]";
 					string ppExpected = @"[
-		1,
-		2,
-		3,
-		4,
-		5,
-		6
-	]".Replace('\'', '\"');
+	1,
+	2,
+	3,
+	4,
+	5,
+	6
+]".Replace('\'', '\"');
 
 					str.ShouldBe<string>(strExpected);
 					pp.ShouldBe<string>(ppExpected);
@@ -995,19 +995,19 @@ namespace JsonTests {
 
 					string strExpected = "[[],[[]],[[[]]]]";
 					string ppExpected = @"[
+	[
+	],
+	[
 		[
-		],
+		]
+	],
+	[
 		[
 			[
-			]
-		],
-		[
-			[
-				[
-				]
 			]
 		]
-	]";
+	]
+]";
 					str.ShouldBe<string>(strExpected);
 					pp.ShouldBe<string>(ppExpected);
 
@@ -1038,35 +1038,35 @@ namespace JsonTests {
 
 				string strExpected = "{'value':20,'level':5,'name':'Sword of Boom','desc':'It goes boom.','damage':[{'power':25,'type':'fire'},{'power':10,'type':'elec'}],'proc':{'chance':0.1,'scripts':['explode',{'name':'stun','chance':0.35,'duration':3}]}}".Replace('\'', '\"');
 				string ppExpected = @"{
-		'value':20,
-		'level':5,
-		'name':'Sword of Boom',
-		'desc':'It goes boom.',
-		'damage':
-		[
-			{
-				'power':25,
-				'type':'fire'
-			},
-			{
-				'power':10,
-				'type':'elec'
-			}
-		],
-		'proc':
+	'value':20,
+	'level':5,
+	'name':'Sword of Boom',
+	'desc':'It goes boom.',
+	'damage':
+	[
 		{
-			'chance':0.1,
-			'scripts':
-			[
-				'explode',
-				{
-					'name':'stun',
-					'chance':0.35,
-					'duration':3
-				}
-			]
+			'power':25,
+			'type':'fire'
+		},
+		{
+			'power':10,
+			'type':'elec'
 		}
-	}".Replace('\'', '\"');
+	],
+	'proc':
+	{
+		'chance':0.1,
+		'scripts':
+		[
+			'explode',
+			{
+				'name':'stun',
+				'chance':0.35,
+				'duration':3
+			}
+		]
+	}
+}".Replace('\'', '\"');
 
 				str.ShouldBe<string>(strExpected);
 				//Debug.Log(pp);
@@ -1124,9 +1124,9 @@ namespace JsonTests {
 			public static void TestObjectSetParse() {
 				{
 					string raw = @"
-	{
-		a, b, c, one, two, three,
-	}".Replace('\'', '\"');
+{
+	a, b, c, one, two, three,
+}".Replace('\'', '\"');
 
 					JsonObject parsed = Json.Parse<JsonObject>(raw);
 
@@ -1148,9 +1148,9 @@ namespace JsonTests {
 			public static void TestArraySetParse() {
 				{
 					string raw = @"
-	[
-		a, b, c, one, two, three
-	]
+[
+	a, b, c, one, two, three
+]
 	".Replace('\'', '\"');
 
 					JsonArray parsed = Json.Parse<JsonArray>(raw);
@@ -1477,14 +1477,14 @@ namespace JsonTests {
 					@"{} //Comment after closing",
 				
 					@"
-	{ // empty object with comment inside
-	}", 
-					@"//empty with comment before
-	{//inside
-		//indented
-	}//after
-	//and far after
-	",
+{ // empty object with comment inside
+}", 
+				@"//empty with comment before
+{//inside
+	//indented
+}//after
+//and far after
+",
 				};
 				JsonObject empty = new JsonObject();
 				TestObjects(empties, empty);
@@ -1492,16 +1492,16 @@ namespace JsonTests {
 				string[] smalls = new string[] {
 					@"{thing:'value'}//yep",
 					@"//
-	{//
-	//
-	thing//
-	//
-	://
-	//
-	'value'//
-	//
-	}//
-	//",
+{//
+//
+thing//
+//
+://
+//
+'value'//
+//
+}//
+//",
 				};
 				JsonObject small = new JsonObject("thing", "value");
 				TestObjects(smalls, small);
@@ -1512,10 +1512,10 @@ namespace JsonTests {
 					@"[]//",
 					@"[] //",
 					@"//
-	[//
-	//
-	]//
-	//",		
+[//
+//
+]//
+//",		
 				};
 
 				JsonArray empty = new JsonArray();
@@ -1524,21 +1524,21 @@ namespace JsonTests {
 				string[] smalls = new string[] {
 					@"['a','b','c',1,2,3]//Junk",
 					@"
-	//
-	[//begin
-	'a','b','c',//letters
-	1,2,3,//numbers
+//
+[//begin
+'a','b','c',//letters
+1,2,3,//numbers
 
-	]//and
-	//done",
-					@"
-	//
-	[//begin
-	'a','b','c',//letters
-	1,2,3//numbers
+]//and
+//done",
+				@"
+//
+[//begin
+'a','b','c',//letters
+1,2,3//numbers
 
-	]//and
-	//done",
+]//and
+//done",
 				};
 				JsonArray small = new JsonArray("a", "b", "c", 1, 2, 3);
 				TestArrays(smalls, small);
@@ -1548,8 +1548,8 @@ namespace JsonTests {
 
 				{
 					string data = @"
-	{ // empty object with comment
-	}
+{ // empty object with comment
+}
 	".Replace('\'', '\"');
 
 					JsonObject obj = Json.Parse(data) as JsonObject;
@@ -1560,9 +1560,9 @@ namespace JsonTests {
 
 				{
 					string data = @"
-	{
-		thing: 'value', // Explanation
-	}
+{
+	thing: 'value', // Explanation
+}
 	".Replace('\'', '\"');
 					JsonObject obj = Json.Parse(data) as JsonObject;
 
@@ -1573,10 +1573,10 @@ namespace JsonTests {
 
 				{
 					string data = @"
-	{
-		thing: 'value' 
-		// Explanation
-	}
+{
+	thing: 'value' 
+	// Explanation
+}
 	".Replace('\'', '\"');
 					JsonObject obj = Json.Parse(data) as JsonObject;
 
@@ -1586,10 +1586,10 @@ namespace JsonTests {
 				}
 				{
 					string data = @"
-	{
-		thing: 'value',
-		// Explanation
-	}
+{
+	thing: 'value',
+	// Explanation
+}
 	".Replace('\'', '\"');
 					JsonObject obj = Json.Parse(data) as JsonObject;
 
@@ -1600,10 +1600,10 @@ namespace JsonTests {
 
 				{
 					string data = @"
-	{
-		// Explanation
-		thing: 'value' 
-	}
+{
+	// Explanation
+	thing: 'value' 
+}
 	".Replace('\'', '\"');
 					JsonObject obj = Json.Parse(data) as JsonObject;
 
