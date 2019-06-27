@@ -134,15 +134,8 @@ public partial class XJS {
 		if (tok.At(";")) { tok.Next(); return null; }
 		else if (tok.At("if")) { return tok.ParseIfStmt(); }
 		else if (tok.At("var")) { return tok.ParseDecStmt(); }
-		else if (tok.At(NAME)) { 
-			Node check = tok.ParseAssignOrFuncCall(); 
-			if (check.type == VALUE) {
-				Debug.Log("PARSE STATEMENT SAW VALUE:\n" + check);
-				tok.Error("Saw value by iteslf. A value is not a proper statement."); 
-			}
-
-			return check;
-		} else if (tok.At("{")) { return tok.ParseCodeBlock(); }
+		else if (tok.At(NAME)) { return tok.ParseAssignOrFuncCall();} 
+		else if (tok.At("{")) { return tok.ParseCodeBlock(); }
 		else if (tok.At("return")) { return tok.ParseReturnStmt(); }
 		else if (tok.At("for")) { return tok.ParseForLoop(); }
 		else if (tok.At("each")) { return tok.ParseEachLoop(); }
@@ -166,6 +159,9 @@ public partial class XJS {
 			loop?.Map("label", label);
 
 			return loop;
+		}
+		else if (tok.At(STRING) || tok.At(NUMBER) || tok.At(NAME) || tok.At("(") || tok.At("-")) {
+			return tok.ParseExpression();
 		}
 
 		return null;

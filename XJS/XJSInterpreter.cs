@@ -15,7 +15,7 @@ public partial class XJS {
 	public delegate JsonValue BinaryOp(JsonValue lhs, JsonValue rhs);
 
 	/// <summary> Class holding the logic for interpreting a program tree </summary>
-	public class XJSInterpreter {
+	public class Interpreter {
 
 		/// <summary> Class to keep track of contexts and scopes </summary>
 		public class Frame : System.Collections.Generic.List<JsonObject> {
@@ -69,6 +69,8 @@ public partial class XJS {
 						baseContext[key] = value;
 					} else if (theThis != null) {
 						DoSet(theThis, key, value);
+					} else {
+						baseContext[key] = value;
 					}
 					
 				}
@@ -308,7 +310,7 @@ public partial class XJS {
 
 
 		/// <summary> Sets up a Frame to a default state. </summary>
-		public XJSInterpreter() {
+		public Interpreter() {
 			global = new JsonObject();
 
 			// Set up a debug object... (Debug.Log, wew)
@@ -675,7 +677,9 @@ public partial class XJS {
 
 							return value;
 						}
-
+					case ARITHFACTOR: {
+							return -Execute(node.Child("negate"));
+						}
 					case BOOLFACTOR: {
 							JsonValue val = Execute(node.Child("value"));
 
