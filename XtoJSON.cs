@@ -95,9 +95,9 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 2;
+	public const int MINOR = 3;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 2;
+	public const int REV = 0;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
