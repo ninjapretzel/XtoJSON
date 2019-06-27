@@ -234,8 +234,10 @@ public partial class XJS {
 						}
 
 					} catch (Exception e) {
-						Debug.LogError($"Scripting Error: Failed to invoke method {type}.{key} on object of type {type}: {e}");
+						Debug.LogError($"Scripting Error: Failed to invoke method {type}.{key}: {e}");
 					}
+				} else {
+					Debug.LogError($"Scripting Error: No getter method on property {type}.{key}.");
 				}
 			}
 
@@ -263,7 +265,44 @@ public partial class XJS {
 		/// <param name="key"> Key to set, may be index or key  </param>
 		/// <param name="value"> Value to set </param>
 		public static void DoSet(object obj, string key, JsonValue value) {
+			if (obj is JsonBool || obj is JsonNull || obj is JsonNumber || obj is JsonString) {
+				return;
+			}
+			if (obj is JsonObject && (obj as JsonObject).ContainsKey(key)) {
+				(obj as JsonObject)[key] = value;
+				return;
+			}
 
+			int ind;
+			if (obj is JsonArray
+				&& int.TryParse(key, out ind)
+				&& (ind >= 0 && (ind < (obj as JsonArray).Count))) {
+				(obj as JsonArray)[ind] = value;
+				return;
+			}
+
+			Type type = obj.GetType();
+			MethodInfo methodCheck = type.GetMethod(key, PUBLIC_INSTANCE);
+			if (methodCheck != null) {
+				// Note: Not sure what to do in this case. Probably want to log a message and not change anything.
+			}
+
+			PropertyInfo propertyCheck = type.GetProperty(key, PUBLIC_INSTANCE);
+			if (propertyCheck != null) {
+				MethodInfo setter = propertyCheck.GetSetMethod();
+				if (setter != null) {
+					object[] argArr = new object[1];
+					try {
+						argArr[0] = Json.GetValue(value, setter.GetParameters()[0].ParameterType);
+
+					} catch (Exception e) {
+						Debug.LogError($"Scripting Error: Failed to call setter {type}.{key}: {e}");
+					}
+
+				} else {
+					Debug.LogError($"Scripting Error: No setter method on property {type}.{key}.");
+				}
+			}
 
 		}
 
