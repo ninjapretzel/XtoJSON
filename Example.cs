@@ -17,12 +17,60 @@ public class Example : MonoBehaviour {
 		JsonExample.StructExample();
 		JsonExample.ReflectionExample_Foobar();
 		JsonExample.ReflectionExample_NestedList();
+		
+		JsonExample.FromReadme();
+
 	}
+
+
 }
 
 #endif
 
 public class JsonExample {
+	#if !UNITY_2019 && !UNITY_2018
+	public struct Vector3 {
+		public float x,y,z;
+		public Vector3(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+		public override string ToString() {
+			return $"({x}, {y}, {z})";
+		}
+	}
+	#endif
+
+	public static void FromReadme() {
+		{
+			Vector3 v = Json.To<Vector3>("{x:5,y:3,z:1}");
+			Print(v);// (5.0, 3.0, 1.0)
+		}
+		{
+			Vector3 v = new Vector3(1, 2, 3);
+			string json = Json.ToJson(v); 
+			Print(json); // {"x":1,"y":2,"z":3}
+
+		}
+		{
+			// Multiple ways,
+			// Direct parse and interpret with as or cast...
+			JsonObject obj1 = Json.Parse("{x:5,y:3,z:1}") as JsonObject;
+			JsonObject obj2 = (JsonObject)Json.Parse("{x:5,y:3,z:1}");
+			// Generic parse
+			JsonObject obj3 = Json.Parse<JsonObject>("{x:5,y:3,z:1}");
+		}
+		{
+			Vector3 someObject = new Vector3(123,456,789);
+			JsonObject obj = Json.Reflect(someObject) as JsonObject;
+		}
+
+		{
+			JsonObject obj = new JsonObject(); // Empty Object
+			obj["key"] = "value"; // Can use indexing syntax as dictionary
+			obj["ayy"] = "lmao";
+			foreach (var pair in obj) { /* print($"{pair.Key}: {pair.Value}"); */} // Can iterate as dictionary 
+			JsonObject obj2 = new JsonObject("key", "value", "ayy", "lmao"); // can construct via params[]}
+
+		}
+	}
 
 	//Conditional stuff to support for examples in unity.
 #if UNITY_EDITOR

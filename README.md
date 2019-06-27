@@ -1,6 +1,6 @@
 # XtoJSON
 ### Json and a bit more
-Readme last updated 2.2.1
+Readme last updated 2.3.0
 
 XtoJSON is, a lightweight JSON parser written in C#.
 I wrote it because:
@@ -28,7 +28,8 @@ I wrote it because:
 - Can plug in arbitrary IDictionary types to use internally
 	- Need multithreading support? Assign the following on startup:
 	- `JsonObject.DictionaryGenerator = ()=>new ConcurrentDictionary<JsonString, JsonValue>();`
-	
+- *Experimental* Scripting language which can closely interop with the JsonValue types.
+
 ## Does not:
 - Does not detect circular references when serializing objects
 - Does not support `\u####` notation 
