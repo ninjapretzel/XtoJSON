@@ -13,8 +13,10 @@ using UnityEngine;
 
 public class Example : MonoBehaviour {
 	void Start() {
-		Json_Tests.RunTests();
-
+		JsonExample.ObjectExample();
+		JsonExample.StructExample();
+		JsonExample.ReflectionExample_Foobar();
+		JsonExample.ReflectionExample_NestedList();
 	}
 }
 
