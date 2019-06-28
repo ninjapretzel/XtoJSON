@@ -427,14 +427,26 @@ public partial class XJS {
 				Frame next = new Frame(theThis, context);
 				// Push initial scope block into stackframe 
 				next.Push();
+				var args = new JsonArray();
+				var argNames = new JsonArray();
+
 				for (int i = 0; i < varlist.DataListed; i++) {
 					var paramName = varlist.Data(i);
 					//Dbg($"Setting param {paramName} to {prams[i]}");
-					// Copy vars into initial scope (they are assumed to line up)
-					next.Declare(paramName, prams[i]);
+					if (i < prams.Count) {
+						// Copy vars into initial scope (they are assumed to line up)
+						next.Declare(paramName, prams[i]);
+					}
+
 					//Dbg(""+next);
+					argNames.Add(paramName);
 				}
+				args.AddAll(prams);
+
+				next.Declare("argNames", argNames);
+				next.Declare("args", args);
 				next.Push();
+
 				// Push stackframe onto stack
 				frames.Push(next);
 
@@ -808,7 +820,7 @@ public partial class XJS {
 						}
 
 					case CONTINUESTMT: {
-							continueTarget = node.Data("target") ?? "!FixedBreak!";
+							continueTarget = node.Data("target") ?? "!FixedContinue!";
 							break;
 						}
 
@@ -961,6 +973,7 @@ public partial class XJS {
 
 								// Check for breaking
 								if (breakTarget != null) {
+									//Dbg($"Loop Breaking to {breakTarget}");
 									if (breakTarget == label || breakTarget == "!FixedBreak!") { 
 										// If it's a fixed label or ours, this is the place to break
 										breakTarget = null; 
@@ -972,6 +985,7 @@ public partial class XJS {
 
 								// Check for continuing
 								if (continueTarget != null) {
+									//Dbg($"Loop continuing to {continueTarget}");
 									if (continueTarget == label || continueTarget == "!FixedContinue!") {
 										// If it's a fixed label or ours, this is the place to restart.
 										continueTarget = null; 

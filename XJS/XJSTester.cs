@@ -202,7 +202,74 @@ else { ""I can't count that high."" }
 			}
 		}
 
+		public static void TestLoopLabels() {
+			{
+				string expected = "Gottem";
+				TestRun(@"
+var it = ""dont gottem""
+var SomeData = { Get: func(a,b) => { return 1 + a * b } };
+:outer: 
+for (var y = 0; y < 10; y++) {
+	for (var x = 0; x < 10; x++) {
+		it = ""dont gottem"";
+		if (SomeData.Get(x,y) == 50) {
+			it = ""Gottem"";
+			break :outer:
+		}
+		it = ""dont gottem"";
 	}
+}
+return it;
+", expected);
+				TestRun(@"
+var it = ""dont gottem""
+var SomeData = { Get: func(a,b) => { return 1 + a * b } }; // Very compact, but should still work.
+x=0;y=0;
+:outer:
+while (y < 10) {
+	x = 0;
+	while (x < 10) {
+		it=""dont gottem"";
+		if (SomeData.Get(x,y) == 50) { 
+			it = ""Gottem""; 
+			break :outer: 
+		} 
+		it = ""dont gottem"";
+		x++
+	}
+	y++
+}
+return it
+", expected);
+				// Compact version of previous:
+				TestRun(@"
+var it = ""dont gottem""
+var SomeData = { Get: func(a,b) => { return 1 + a * b } }; // Very compact, but should still work.
+x=0;y=0;:outer:while(y<10){x=0;while(x<10){it=""dont gottem"";if(SomeData.Get(x,y)==50){it=""Gottem"";break:outer:}it=""dont gottem"";x++}y++}
+return it
+", expected);
+			}
+
+		}
+
+		public static void TestArgs() {
+			{
+				TestRun(@"
+var fn = func() => { 
+	var x = """"; 
+	each (arg in args) { 
+		x += arg + "" ""; 
+	}
+}
+fn(1, 2, 3, 4, 5);
+", "1 2 3 4 5 ");
+
+			}
+		}
+
+
+	}
+
 
 #endif
 }
