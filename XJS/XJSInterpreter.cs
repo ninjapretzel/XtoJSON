@@ -630,6 +630,8 @@ public partial class XJS {
 								JsonValue result = Execute(expr);
 								if (assignType == "=") {
 									SetAtPath(targetPath, result);
+									return result;
+
 								} else {
 									BinaryOp op;
 									switch (assignType[0]) {
@@ -649,31 +651,22 @@ public partial class XJS {
 								}
 						
 							}
-
-							break;
 						}
 						//return frame[node.data["target"]] = Execute(node.nodes["expr"]);
 
 					case ATOM: {
 							string cdata = node.Data("const");
 							Node inner = node.Child("inner");
-							Node func = node.Child("func");
 
 							if (cdata != null) {
 								double d;
 								if (double.TryParse(cdata, out d)) { return d; }
 								return cdata;
 							} else if (inner != null) {
-						
 								return Execute(inner);
-						
-							} else if (func != null) {
+							} 
 							
-								// TBD: make Function declarations work
-								// return MakeFunc(func);
-							}
-							
-							break;
+							throw new Exception(@"Scripting error: Unhandled atom type. Should have a constant or inner expression. ");
 						}
 
 					case VALUE: {
@@ -823,7 +816,118 @@ public partial class XJS {
 							breakTarget = node.Data("target") ?? "!FixedBreak!";
 							break;
 						}
-						
+					case EACHLOOP: {
+							//Dbg($"In Eachloop");
+							// Each loops are weird compared to standard loops.
+							string label = node.Data("label");
+
+							// They read a collection value 
+							Node targetPathNode = node.Child("path");
+							// Map each item or pair in the collection to one or more names
+							string name = node.Data("name");
+							Node nameList = node.Child("names");
+							// And then repeatedly call a body with each var being set into the names.
+							Node body = node.Child("body");
+
+							// Look up the name if it was not set solo
+							if (name == null) { name = nameList.Data(0); }
+
+							string name2 = (nameList != null && nameList.DataListed > 1) ? nameList.Data(1) : null;
+							//Look up collection to iterate 
+							string targetPath = Execute(targetPathNode).stringVal;
+							var target = GetAtPath(targetPath);
+
+							frame.Push();
+							frame.Declare(name, null);
+							//Dbg($"EACHLOOP: Declared {name} ");
+							if (name2 != null) { 
+								frame.Declare(name2, null); 
+							}
+							
+							JsonValue last = null;
+							if (target is JsonArray) {
+								foreach (var item in (target as JsonArray)) {
+									//Dbg($"EACHLOOP on Array: set {name} to {item} ");
+									frame[name] = item;
+									last = Execute(body);
+
+									// Check for breaking
+									if (breakTarget != null) {
+										if (breakTarget == label || breakTarget == "!FixedBreak!") {
+											// If it's a fixed label or ours, this is the place to break
+											breakTarget = null;
+											// And we break.
+										}
+										// And if it's not, we also break.
+										break;
+									}
+
+									// Check for continuing
+									if (continueTarget != null) {
+										if (continueTarget == label || continueTarget == "!FixedContinue!") {
+											// If it's a fixed label or ours, this is the place to restart.
+											continueTarget = null;
+											// and we don't break... (and we still want to hit the increment)
+											// So we don't continue anyway.
+										} else {
+											// If target continue on some other loop, we get outta here.
+											break;
+										}
+									}
+
+									if (Returning) {
+										frame.Pop();
+										return returnValue;
+									}
+									
+								}
+							} else if (target is JsonObject) {
+								foreach (var pair in (target as JsonObject)) {
+									var key = pair.Key; 
+									var val = pair.Value;
+									//Dbg($"EACHLOOP on Object: set {name},{name2} to {key},{val} ");
+									frame[name] = key;
+									frame[name2] = val;
+
+									last = Execute(body);
+
+									// Check for breaking
+									if (breakTarget != null) {
+										if (breakTarget == label || breakTarget == "!FixedBreak!") {
+											// If it's a fixed label or ours, this is the place to break
+											breakTarget = null;
+											// And we break.
+										}
+										// And if it's not, we also break.
+										break;
+									}
+
+									// Check for continuing
+									if (continueTarget != null) {
+										if (continueTarget == label || continueTarget == "!FixedContinue!") {
+											// If it's a fixed label or ours, this is the place to restart.
+											continueTarget = null;
+											// and we don't break... (and we still want to hit the increment)
+											// So we don't continue anyway.
+										} else {
+											// If target continue on some other loop, we get outta here.
+											break;
+										}
+									}
+
+									if (Returning) {
+										frame.Pop();
+										return returnValue;
+									}
+
+								}
+							}
+
+							frame.Pop();
+
+
+							return last;
+						}
 					case FORLOOP: // These 3 are actually super similar.
 					case WHILELOOP:
 					case DOWHILELOOP: {
@@ -879,7 +983,12 @@ public partial class XJS {
 									}
 								}
 
-								if (Returning) { return returnValue; }
+								if (Returning) { 
+									// Pop the context before we are done...
+									if (node.type == FORLOOP) { frame.Pop(); }
+
+									return returnValue; 
+								}
 
 								// Execute increment statement if it exists...
 								if (incr != null) { Execute(incr); }
@@ -905,8 +1014,7 @@ public partial class XJS {
 
 			return null;
 		}
-
-
+		
 	}
 
 	

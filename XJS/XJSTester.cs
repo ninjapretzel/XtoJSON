@@ -180,6 +180,20 @@ else { ""I can't count that high."" }
 			}
 		}
 
+		public static void TestWhileLoop() {
+			{
+				TestRun(@"x = 0; while(x <= 10) { x++ }", 10);
+				TestRun(@"x = 0; while(x < 10) { x++ }", 9);
+				TestRun(@"x = 0; while(x < 10) { ++x }", 10);
+			}
+		}
+
+		public static void TestEachLoop() {
+			{
+				TestRun(@"x = 0; arr = [ 1, 2, 3, 4, 5]; each (v in arr) { x += v }", 15);
+			}
+		}
+
 	}
 
 #endif

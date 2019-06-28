@@ -282,14 +282,18 @@ public partial class XJS {
 		tok.RequireNext("each");
 		tok.RequireNext("(");
 
-		tok.Require(NAME);
-		eachloop.Map("name", tok.peekToken);
-		tok.Next();
+		if (tok.At(NAME)) {
+			eachloop.Map("name", tok.peekToken);
+			tok.Next();
+		} else {
+			tok.Require("(");
+			eachloop.Map("names", tok.ParseVarList());
+		}
 
 		tok.RequireNext("in");
 		
 		// Todo: Change to ParseExprPath
-		eachloop.Map("path", tok.ParseFixedPath());
+		eachloop.Map("path", tok.ParseExprPath());
 		tok.RequireNext(")");
 
 		eachloop.Map("body", tok.ParseStatement());
