@@ -110,6 +110,7 @@ namespace JsonTests {
 			}
 			
 		}
+
 		public static void TestPaths() {
 			{
 				JsonObject expected = new JsonObject("jumpedOver", "true");
@@ -131,11 +132,45 @@ the = {
 		}
 	}
 }
-adj0 = ""quick"";
-adj1 = ""brown"";
-adj2 = ""lazy"";
-the[adj0][adj1].fox.jumpsOver(the[adj2].dog);
+adj = [ ""quick"", ""brown"", ""lazy"" ]
+the[ adj[0] ][ adj[1] ].fox.jumpsOver(the[ adj[2] ].dog);
 ", expected);
+			}
+		}
+
+		public static void TestLogic() {
+			{
+				JsonValue expected = "yes";
+				TestRun(@"x = 5; if (x == 5) { ""yes"" } else { ""no"" }", expected);
+				TestRun(@"x = 5; if (x != 5) { ""no"" } else { ""yes"" }", expected);
+			}
+			{
+				JsonValue expected = "five";
+				string counter = @"
+if (x == 1) { ""one"" }
+else if (x == 2) { ""two"" }
+else if (x == 3) { ""three"" }
+else if (x == 4) { ""four"" }
+else if (x == 5) { ""five"" }
+else if (x == 6) { ""six"" }
+else if (x == 7) { ""seven"" }
+else if (x == 8) { ""eight"" }
+else if (x == 9) { ""nine"" }
+else { ""I can't count that high."" }
+";
+				TestRun("x=5;\n"+counter, "five");
+				TestRun("x=3;\n"+counter, "three");
+				TestRun("x=7;\n"+counter, "seven");
+				TestRun("x=999;\n"+counter, "I can't count that high.");
+				TestRun("x=9913219;\n"+counter, "I can't count that high.");
+			}
+		}
+
+		public static void TestForLoop() {
+			{
+				TestRun("x = 0; for (var i = 0; i <= 10; i++) { x++ }", 10);
+				TestRun("x = 0; for (var i = 0; i < 10; i++) { x++ }", 9);
+				TestRun("x = 0; for (var i = 0; i < 10; i++) { ++x }", 10);
 			}
 		}
 

@@ -228,7 +228,7 @@ public partial class XJS {
 
 				var result = (obj as JsonArray)[ind];
 				//Dbg($"Direct access on JsonArray[{ind}] for {result} ({result.GetType()})");
-
+				return result;
 			}
 
 			//Dbg($"DoGet: Attempting to reflect {key} on {obj.GetType()}.");

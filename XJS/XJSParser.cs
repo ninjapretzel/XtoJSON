@@ -191,7 +191,8 @@ public partial class XJS {
 			return loop;
 		}
 		else if (tok.At(STRING) || tok.At(NUMBER) || tok.At(NAME) 
-			|| tok.At("(") || tok.At("-") || tok.At("[")) {
+			|| tok.At("(") || tok.At("-") || tok.At("[")
+			|| tok.At("++") | tok.At("--")) {
 			return tok.ParseExpression();
 		}
 
