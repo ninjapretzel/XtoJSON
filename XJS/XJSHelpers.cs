@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using Lib;
+using System.Runtime.CompilerServices;
 
 public static class XJSHelpers {
 	/// <summary> Checks the string starting at position = startIndex to see if check directly matches the string from that position. </summary>
@@ -18,6 +19,30 @@ public static class XJSHelpers {
 			if (str[idx] != check[i]) { return false; }
 		}
 		return true;
+	}
+
+	/// <summary> Checks the string for whitespace at a given index. Outside of the string is considered whitespace. </summary>
+	/// <param name="str"> String to check </param>
+	/// <param name="i"> index to check at </param>
+	/// <returns> True if whitespace is at the index or index is invalid, false otherwise. </returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal static bool WhitespaceAt(this string str, int i) {
+		if (i < 0 || i >= str.Length) { return true; }
+		char c = str[i];
+		return c == ' ' || c == '\t' || c == '\n' || c == '\r';
+	}
+
+	/// <summary> Checks the string for an alphanumeric character at a given index. </summary>
+	/// <param name="str"> String to check </param>
+	/// <param name="i"> index to check at </param>
+	/// <returns> True if there is an alphanumeric characater at the index, false otherwise. </returns>
+	[MethodImpl(MethodImplOptions.AggressiveInlining)]
+	internal static bool AlphaNumAt(this string str, int i) {
+		if (i < 0 || i >= str.Length) { return false; }
+		char c = str[i];
+		return ( (c >= 'a' && c <= 'z') 
+			|| (c >= 'A' && c <= 'Z') 
+			|| (c >= '0' && c <= '9'));
 	}
 
 	public static void TestMatchAt() {

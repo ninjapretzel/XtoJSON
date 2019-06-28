@@ -108,6 +108,35 @@ namespace JsonTests {
 				TestRun(@"obj = {}; obj.x = 4 obj.y = 5 obj.z = 6 return obj", expected);
 
 			}
+			
+		}
+		public static void TestPaths() {
+			{
+				JsonObject expected = new JsonObject("jumpedOver", "true");
+				TestRun(@"
+the = { 
+	quick: { 
+		brown: { 
+			fox: { 
+				jumpsOver: func(it)->{
+					it[""jumpedOver""] = true
+					return it;
+				}
+			} 
+		} 
+	},
+	lazy: {
+		dog: {
+
+		}
+	}
+}
+adj0 = ""quick"";
+adj1 = ""brown"";
+adj2 = ""lazy"";
+the[adj0][adj1].fox.jumpsOver(the[adj2].dog);
+", expected);
+			}
 		}
 
 	}

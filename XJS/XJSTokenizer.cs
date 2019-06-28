@@ -134,7 +134,7 @@ public partial class XJS {
 			if (c == '\"') { return ExtractString('\"'); }
 			if (c == '\'') { return ExtractString('\''); }
 			foreach (string p in punct) { if (src.MatchAt(i, p)) { return new Token(p, line, col); } }
-			foreach (string k in keywords) { if (src.MatchAt(i, k)) { return new Token(k, line, col); } }
+			foreach (string k in keywords) { if (src.MatchAt(i, k) && !src.AlphaNumAt(i + k.Length)) { return new Token(k, line, col); } }
 
 			Match nameCheck = name.Match(src, i);
 			if (nameCheck.Success && nameCheck.Index == i) { return new Token(nameCheck.Value, NAME, line, col); }
