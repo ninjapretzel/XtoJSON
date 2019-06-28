@@ -187,10 +187,18 @@ else { ""I can't count that high."" }
 				TestRun(@"x = 0; while(x < 10) { ++x }", 10);
 			}
 		}
+		public static void TestDoWhileLoop() {
+			{
+				TestRun(@"x = 0; do { x++ } while (x <= 10)", 10);
+				TestRun(@"x = 0; do { x++ } while (x < 10)", 9);
+				TestRun(@"x = 0; do { ++x } while (x < 10)", 10);
+			}
+		}
 
 		public static void TestEachLoop() {
 			{
 				TestRun(@"x = 0; arr = [ 1, 2, 3, 4, 5]; each (v in arr) { x += v }", 15);
+				TestRun(@"x = """"; arr = [ ""1"", ""2"", ""3"", ""4"", ""5""]; each (v in arr) { x += v }", "12345");
 			}
 		}
 
