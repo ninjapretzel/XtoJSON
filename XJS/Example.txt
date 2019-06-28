@@ -95,7 +95,7 @@ for (var x = 0; x < 10; x++) {
 	if (SomeFunc(x)) { break }
 }
 xx = 0;
-while (xx < 10) { if (SomeFunc(x)) { break; } x++; }
+while (xx < 10) { if (SomeFunc(x)) { break; } xx++; }
 */
 // Lets label some loops:
 
