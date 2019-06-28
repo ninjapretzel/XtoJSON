@@ -43,7 +43,7 @@ public partial class XJS {
 				imports.Add(tok.peekToken);
 				tok.Next();
 				
-				Token importPath = tok.ParsePath();
+				Token importPath = tok.ParseFixedPath();
 				Node import = new Node(IMPORT_RENAME);
 				
 				//tok.Next();
@@ -64,7 +64,7 @@ public partial class XJS {
 
 			} else if (tok.At("export")) { // Redundant, but more clear.
 				tok.Next();
-				exports.List(tok.ParsePath());
+				exports.List(tok.ParseFixedPath());
 			}
 
 			if (tok.At(";")) { tok.Next(); } // Consume, but don't require ';'
@@ -76,7 +76,7 @@ public partial class XJS {
 	/// <summary> Parses a 'path' which is a series of names separated by '.' </summary>
 	/// <param name="tok"> Token Stream to read from </param>
 	/// <returns> Program node built from tokenizer stream </returns>
-	public static Token ParsePath(this Tokenizer tok) {
+	public static Token ParseFixedPath(this Tokenizer tok) {
 
 		tok.Require(NAME);
 		StringBuilder path = new StringBuilder(tok.content);
@@ -93,6 +93,23 @@ public partial class XJS {
 
 
 		return new Token(path.ToString(), "!PATH", start.line, start.col);
+	}
+
+	public static Node ParseExprPath(this Tokenizer tok) {
+		// All paths start with a name. 
+		tok.Require(NAME);
+		// Token start = tok.Next();
+
+		Node path = new Node(PATHEXPR);
+		Node first = new Node(ATOM);
+
+		path.List(tok.peekToken);
+		tok.Next();
+		
+		// TBD: Figure out the details for doing this parsing.
+
+
+		return path;
 	}
 	
 	/// <summary> Parses a label string. This is prefixed/suffixed with ':' </summary>
@@ -134,7 +151,7 @@ public partial class XJS {
 		if (tok.At(";")) { tok.Next(); return null; }
 		else if (tok.At("if")) { return tok.ParseIfStmt(); }
 		else if (tok.At("var")) { return tok.ParseDecStmt(); }
-		else if (tok.At(NAME)) { return tok.ParseAssignOrFuncCall();} 
+		else if (tok.At(NAME)) { return tok.ParseFromName();} 
 		else if (tok.At("{")) { return tok.ParseCodeBlock(); }
 		else if (tok.At("return")) { return tok.ParseReturnStmt(); }
 		else if (tok.At("for")) { return tok.ParseForLoop(); }
@@ -160,7 +177,8 @@ public partial class XJS {
 
 			return loop;
 		}
-		else if (tok.At(STRING) || tok.At(NUMBER) || tok.At(NAME) || tok.At("(") || tok.At("-")) {
+		else if (tok.At(STRING) || tok.At(NUMBER) || tok.At(NAME) 
+			|| tok.At("(") || tok.At("-") || tok.At("[")) {
 			return tok.ParseExpression();
 		}
 
@@ -211,7 +229,7 @@ public partial class XJS {
 			Node assign;
 			if (tok.At("var")) { assign = tok.ParseDecStmt(); }
 			else { 
-				assign = tok.ParseAssignOrFuncCall(); 
+				assign = tok.ParseFromName(); 
 				if (assign.type != ASSIGN) { tok.Error("For loop initializer can only have a declaration or assignment statement!"); }
 			}
 			forloop.Map("init", assign);
@@ -224,7 +242,7 @@ public partial class XJS {
 		tok.RequireNext(";");
 
 		if (!tok.At(")")) {
-			Node assign = tok.ParseAssignOrFuncCall();
+			Node assign = tok.ParseFromName();
 			if (assign.type != ASSIGN) { tok.Error("For loop increment can only have an assignment statement!"); }
 			forloop.Map("incr", assign);
 		}
@@ -257,7 +275,8 @@ public partial class XJS {
 
 		tok.RequireNext("in");
 		
-		eachloop.Map("path", tok.ParsePath());
+		// Todo: Change to ParseExprPath
+		eachloop.Map("path", tok.ParseFixedPath());
 		tok.RequireNext(")");
 
 		eachloop.Map("body", tok.ParseStatement());
@@ -637,11 +656,11 @@ public partial class XJS {
 	///			<para> object - In-line Object </para>
 	///			<para> array - In-line Array</para>
 	///			<para> func - Function definition </para>
-	///			<para> value - Variable value from <see cref="ParseAssignOrFuncCall(Tokenizer)"/></para>
+	///			<para> value - Variable value from <see cref="ParseFromName(Tokenizer)"/></para>
 	///		</para>
 	///		<para> Or be a node containing: 
 	///			<para> const? - Constant values (number/string values, true/false/null) </para>
-	///			<para> inner? - Assignment with value generation, or function call from <see cref="ParseAssignOrFuncCall(Tokenizer)"/></para>
+	///			<para> inner? - Assignment with value generation, or function call from <see cref="ParseFromName(Tokenizer)"/></para>
 	///		</para>
 	/// </summary>
 	/// <param name="tok"> Token Stream to read from </param>
@@ -665,7 +684,7 @@ public partial class XJS {
 
 			return atom.Map("func", tok.ParseFunc());
 		} else {
-			Node check = atom.Map("inner", tok.ParseAssignOrFuncCall());
+			Node check = atom.Map("inner", tok.ParseFromName());
 			if (check.type == VALUE) { return check; }
 		}
 
@@ -673,7 +692,7 @@ public partial class XJS {
 	}
 
 	/// <summary>
-	///		<para> Parses an assignment statement, or a function call </para>
+	///		<para> Parses a value, assignment statement, or a function call </para>
 	///		<para> 
 	///			Due to the way the grammar rules work, it is difficult to determine if 
 	///			a PATH is the start of an assignment or a function call.
@@ -696,7 +715,7 @@ public partial class XJS {
 	/// </summary>
 	/// <param name="tok"> Token Stream to read from </param>
 	/// <returns> Program node built from tokenizer stream </returns>
-	public static Node ParseAssignOrFuncCall(this Tokenizer tok) {
+	public static Node ParseFromName(this Tokenizer tok) {
 		Node node = new Node(VALUE);
 
 		if (tok.At(INC_DEC_TOKEN)) {
@@ -704,7 +723,7 @@ public partial class XJS {
 			tok.Next();
 			node.type = ASSIGN;
 		}
-		Token path = tok.ParsePath();
+		Token path = tok.ParseFixedPath();
 		Node indexExpr = null;
 		Node funcCallParams = null;
 
@@ -786,8 +805,7 @@ public partial class XJS {
 			tok.Require(NAME);
 			var name = tok.peekToken;
 			tok.Next();
-
-
+			
 			if (tok.At(":")) {
 				tok.RequireNext(":");
 
@@ -798,16 +816,11 @@ public partial class XJS {
 				obj.List(name);
 			}
 			
-			
 			if (tok.At(",")) {
 				tok.Next();
 			}
-			
-			
 
 		}
-
-		// TBD, actual parsing...
 
 		tok.RequireNext("}");
 
@@ -827,7 +840,6 @@ public partial class XJS {
 			arr.List(tok.ParseExpression());
 			// Consume but do not require commas. 
 			if (tok.At(",")) { tok.Next(); }
-			// TBD, actual parsing...
 		}
 
 		tok.RequireNext("]");

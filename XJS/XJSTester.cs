@@ -51,40 +51,63 @@ namespace JsonTests {
 		}
 
 		public static void TestBasics() {
-				TestRun("5", 5);
-				TestRun("5;", 5);
-				TestRun("return 5;", 5);
-				TestRun("return \"5\";", 5);
-				TestRun("return \"five\";", "five");
-				TestRun("x = 5; return x;", 5);
-				TestRun("x = 5; x;", 5);
-				TestRun("x = 5; x", 5);
-				TestRun("x = 5 x", 5);
-				TestRun("var x = 5; return x;", 5);
-				TestRun("var x = 5; x;", 5);
+			TestRun("5", 5);
+			TestRun("5;", 5);
+			TestRun("return 5;", 5);
+			TestRun("return \"5\";", 5);
+			TestRun("return \"five\";", "five");
+			TestRun("x = 5; return x;", 5);
+			TestRun("x = 5; x;", 5);
+			TestRun("x = 5; x", 5);
+			TestRun("x = 5 x", 5);
+			TestRun("var x = 5; return x;", 5);
+			TestRun("var x = 5; x;", 5);
 		}
 		public static void TestIncDec() {
 			TestRun("x = 5; x++; x;", 6);
 			TestRun("x = 5; x++; -x;", -6);
 			TestRun("x = 5; x--; x;", 4);
 			TestRun("x = 5; x--; -x;", -4);
-				
+
 			TestRun("x = -5; x++; x;", -4);
 			TestRun("x = -5; x++; -x;", 4);
 			TestRun("x = -5; x--; x;", -6);
 			TestRun("x = -5; x--; -x;", 6);
 		}
-		
+
 		public static void TestOperators() {
 			TestRun("5 + 4 + 3 + 2 + 1", 15);
 			TestRun(
-@"""the"" + "" "" + ""quick"" + "" "" + ""brown"" + "" "" + ""fox"" + "" "" + ""jumps"" + "" "" + ""over"" + "" "" + ""the"" + "" "" + ""lazy"" + "" "" + ""dog""", 
+@"""the"" + "" "" + ""quick"" + "" "" + ""brown"" + "" "" + ""fox"" + "" "" + ""jumps"" + "" "" + ""over"" + "" "" + ""the"" + "" "" + ""lazy"" + "" "" + ""dog""",
 "the quick brown fox jumps over the lazy dog");
-
-			
-
 		}
 
+		public static void TestLiterals() {
+			{
+				JsonArray expected = new JsonArray();
+				TestRun(@"[]", expected);
+				TestRun(@"return []", expected);
+				TestRun(@"x = func () => { return [] }; x()", expected);
+				TestRun(@"x = func () => { [] }; x()", expected);
+			}
+			{
+				JsonArray expected = new JsonArray(1, 2, 3);
+				TestRun(@"[1,2,3]", expected);
+				TestRun(@"x = []; x.Add(1) x.Add(2) x.Add(3) return x", expected);
+				TestRun(@"x = []; x.Add(1) x.Add(2) x.Add(3) x", expected);
+				TestRun(@"return [1,2,3]", expected);
+				TestRun(@"x = func()=>{ return [1,2,3]; }; return x()", expected);
+			}
+			{
+				JsonObject expected = new JsonObject("x", 4, "y", 5, "z", 6);
+				// An object literal and code block are ambiguous, 
+				// so to return an object literal, only the 'return' statement is valid. 
+				TestRun(@"return { x: 4, y: 5, z: 6 } ", expected);
+				TestRun(@"obj = {}; obj.x = 4 obj.y = 5 obj.z = 6 return obj", expected);
+				TestRun(@"obj = {}; obj[""x""] = 4 obj[""y""] = 5 obj[""z""] = 6 return obj", expected);
+
+			}
+		}
 
 	}
 

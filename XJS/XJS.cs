@@ -151,6 +151,8 @@ public static partial class XJS {
 		FUNCDEC,
 		/// <summary> A list of names, to add to the context of a function </summary>
 		VARLIST,
+		/// <summary> Expression that resolves to a path </summary>
+		PATHEXPR,
 
 	}
 
