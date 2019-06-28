@@ -63,6 +63,12 @@ namespace JsonTests {
 			TestRun("var x = 5; return x;", 5);
 			TestRun("var x = 5; x;", 5);
 		}
+
+		public static void TestLambdas() {
+			TestRun(@"x = func()=>{ ""yay"" }; x()", "yay");
+			TestRun(@"x = func()->{ ""yay"" }; x()", "yay");
+			TestRun(@"x = func(x)->{ x+5 }; x(10)", 15);
+		}
 		public static void TestIncDec() {
 			TestRun("x = 5; x++; x;", 6);
 			TestRun("x = 5; x++; -x;", -6);

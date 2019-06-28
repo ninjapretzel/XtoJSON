@@ -164,7 +164,6 @@ public partial class XJS {
 		if (tok.At(";")) { tok.Next(); return null; }
 		else if (tok.At("if")) { return tok.ParseIfStmt(); }
 		else if (tok.At("var")) { return tok.ParseDecStmt(); }
-		else if (tok.At(NAME)) { return tok.ParseFromName();} 
 		else if (tok.At("{")) { return tok.ParseCodeBlock(); }
 		else if (tok.At("return")) { return tok.ParseReturnStmt(); }
 		else if (tok.At("for")) { return tok.ParseForLoop(); }
