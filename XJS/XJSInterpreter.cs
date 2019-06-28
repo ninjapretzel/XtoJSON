@@ -122,30 +122,46 @@ public partial class XJS {
 		public Exception exception = null;
 
 
-		/// <summary> Gets a value along a path </summary>
+		/// <summary> Gets a value along a path in the current stack.  </summary>
 		/// <param name="path"> Path-formed string </param>
 		/// <returns> Object in the current frame at the given path. </returns>
 		public JsonValue GetAtPath(string path) {
+			JsonValue result;
 			string[] stops = path.Split('.');
-			if (stops.Length == 1) { return frame[path]; }
-			return GetAtPath(stops);
+			if (stops.Length == 1) { result = frame[path]; }
+			else { result = GetAtPath(stops); } 
+			//Dbg($"GetAtPath {{{path}}} is {{{result}}}");
+			return result;
 		}
 
-		/// <summary> Gets a value along a path </summary>
+		/// <summary> Gets a value along a path in the current stack </summary>
 		/// <param name="stops"> Sequence of keys to navigate along path </param>
 		/// <returns> Object in the frame at the given path. </returns>
 		public JsonValue GetAtPath(string[] stops) {
-			
-			JsonValue val = frame[stops[0]];
-			for (int i = 1; i < stops.Length; i++) {
-				if (val == null) { return val; }
-
-				val = val[stops[i]];
-			}
-
-			return val;
+			var target = TracePath(stops);
+			return DoGet(target, stops[stops.Length-1]);
 		}
 
+		/// <summary> Sets a value along the given path in the current stack, to the given value. </summary>
+		/// <param name="path"> Path-formed string </param>
+		/// <param name="value"> Value to set </param>
+		public void SetAtPath(string path, JsonValue value) {
+			//Dbg($"SetAtPath {{{path}}} to {{{value}}}");
+			string[] stops = path.Split('.');
+			if (stops.Length == 1) { frame[path] = value; }
+			else { SetAtPath(stops, value); }
+		}
+		/// <summary> Sets a value along the given path in the current stack, to the given value. </summary>
+		/// <param name="stops"> sequence of keys to navigate along path </param>
+		/// <param name="value"> Value to set </param>
+		public void SetAtPath(string[] stops, JsonValue value) {
+			var target = TracePath(stops);
+
+			DoSet(target, stops[stops.Length-1], value);
+		}
+
+		/// <summary> Debug helper method, colorizes text for easier recognition </summary>
+		/// <param name="str"> text to print </param>
 		private static void Dbg(string str) {
 			Debug.Log($"<color=#444400>{str}</color>");
 		}
@@ -164,12 +180,12 @@ public partial class XJS {
 		/// <param name="stops"> Sequence of keys to navigate along path </param>
 		/// <returns> Second to last object along the provided path stops. May be a Frame or JsonValue, or null. </returns>
 		public object TracePath(string[] stops) {
-			if (stops.Length == 1) { 
-				//Dbg($"No stops, so uses frame's this.");
-				return frame.theThis; 
+			if (stops.Length == 1) {
+				//Dbg($"One stop, so frame");
+				return frame; 
 			}
 			if (stops.Length == 2) { 
-				//Dbg($"One stop, so direct access of frame");
+				//Dbg($"One stop, so directly access frame");
 				return frame[stops[0]]; 
 			}
 
@@ -177,10 +193,13 @@ public partial class XJS {
 			for (int i = 1; i < stops.Length - 1; i++) {
 				//Dbg($"Tracing at stop {i} {{{val}}}");
 				string key = stops[i];
-				if (val is JsonObject && val.ContainsKey(key)) {
+				int k;
+				if (val is JsonArray && int.TryParse(key, out k) && k >= 0 && k < (val as JsonArray).Count) {
+					val = val[k];
+				} else if (val is JsonObject && val.ContainsKey(key)) {
 					val = val[key];
 				} else {
-					return val;
+					return null;
 				}
 			}
 
@@ -192,6 +211,9 @@ public partial class XJS {
 		/// <param name="key">name of thing to get (field/property/method)</param>
 		/// <returns>Thing to get, as a JsonValue</returns>
 		public static JsonValue DoGet(object obj, string key) {
+			if (obj is Frame) {
+				return (obj as Frame)[key];
+			}
 			//Dbg($"DoGet on {{{obj}}} ({obj.GetType()} for {key}");
 			if (obj is JsonObject && (obj as JsonObject).ContainsKey(key)) {
 				var result = (obj as JsonObject)[key];
@@ -267,10 +289,18 @@ public partial class XJS {
 		/// <param name="key"> Key to set, may be index or key  </param>
 		/// <param name="value"> Value to set </param>
 		public static void DoSet(object obj, string key, JsonValue value) {
+			//Dbg($"DoSet {{{key}}} to {{{value}}} on {obj.GetType()}");
+
+			if (obj is Frame) {
+				//Dbg($"DoSet on Frame {{{key}}} to {{{value}}}");
+				(obj as Frame)[key] = value;
+				return;
+			}
 			if (obj is JsonBool || obj is JsonNull || obj is JsonNumber || obj is JsonString) {
 				return;
 			}
-			if (obj is JsonObject && (obj as JsonObject).ContainsKey(key)) {
+			if (obj is JsonObject) {
+				//Dbg($"DoSet on JsonObject {{{key}}} to {{{value}}}");
 				(obj as JsonObject)[key] = value;
 				return;
 			}
@@ -279,6 +309,7 @@ public partial class XJS {
 			if (obj is JsonArray
 				&& int.TryParse(key, out ind)
 				&& (ind >= 0 && (ind < (obj as JsonArray).Count))) {
+				//Dbg($"DoSet on JsonArray {{{ind}}} to {{{value}}}");
 				(obj as JsonArray)[ind] = value;
 				return;
 			}
@@ -286,11 +317,13 @@ public partial class XJS {
 			Type type = obj.GetType();
 			MethodInfo methodCheck = type.GetMethod(key, PUBLIC_INSTANCE);
 			if (methodCheck != null) {
+				//Dbg($"Reflective DoSet on {type} via Method");
 				// Note: Not sure what to do in this case. Probably want to log a message and not change anything.
 			}
 
 			PropertyInfo propertyCheck = type.GetProperty(key, PUBLIC_INSTANCE);
 			if (propertyCheck != null) {
+				//Dbg($"Reflective DoSet on {type} via Property: {{{key}}} to {{{value}}}");
 				MethodInfo setter = propertyCheck.GetSetMethod();
 				if (setter != null) {
 					object[] argArr = new object[1];
@@ -551,37 +584,52 @@ public partial class XJS {
 
 							return obj; 
 						}
+					case PATHEXPR: {
+							StringBuilder s = "";
+							s.Append(Execute(node.Child(0)).stringVal);
+
+							for (int i = 1; i < node.NodesListed; i++) {
+								s.Append(".");
+								s.Append(Execute(node.Child(i)).stringVal);
+							}
+							//Dbg($"Created {s} from PATHEXPR: </color>{node}");
+							
+							return s.ToString();
+						}
 					case ASSIGN: { // Assignment statement 
 							Node expr = node.Child("expr");
 							string assignType = node.Data("assignType");
 							// TODO: Rework this so it traces a path
-							string target = node.Data("target");
+							// string target = node.Data("target");
+							Node targetPathExpr = node.Child("target");
+							string targetPath = Execute(targetPathExpr).stringVal;
 
-							// TODO: Eventually figure out indexing
-							//Node indexExpr = node.Child("indexExpr");
 							string pre = node.Data("pre");
 							string post = node.Data("post");
 						
 							if (pre != null) {
 								BinaryOp op = pre == "++" ? ADD_OP : SUB_OP;
-								JsonValue val = frame[target];
+
+								JsonValue val = GetAtPath(targetPath); // frame[target];
 								JsonValue val2 = op(val, 1);
-								frame[target] = val2;
+								SetAtPath(targetPath, val2);
+								//frame[target] = val2;
 						
 								return val2;
 
 							} else if (post != null) {
 								BinaryOp op = post == "++" ? ADD_OP : SUB_OP;
-								JsonValue val = frame[target];
+								JsonValue val = GetAtPath(targetPath); //frame[targetPath];
 								JsonValue val2 = op(val, 1);
-								frame[target] = val2;
+								SetAtPath(targetPath, val2);
+								//frame[targetPath] = val2;
 						
 								return val;
 
 							} else {
 								JsonValue result = Execute(expr);
 								if (assignType == "=") {
-									frame[target] = result;
+									SetAtPath(targetPath, result);
 								} else {
 									BinaryOp op;
 									switch (assignType[0]) {
@@ -592,9 +640,10 @@ public partial class XJS {
 										case '%': op = MOD_OP; break;
 										default: op = ADD_OP; break;
 									}
-									JsonValue val = frame[target];
+									JsonValue val = GetAtPath(targetPath); //frame[targetPath];
 									JsonValue val2 = op(val, result);
-									frame[target] = val2;
+									SetAtPath(targetPath, val2);
+									//frame[targetPath] = val2;
 
 									return val2;
 								}
@@ -628,15 +677,10 @@ public partial class XJS {
 						}
 
 					case VALUE: {
-							string target = node.Data("target");
-							JsonValue val = GetAtPath(target);
-							Node indexExpr = node.Child("indexExpr");
-
-							if (indexExpr != null) {
-								JsonValue index = Execute(indexExpr);
-								return val[index];
-							}
-
+							Node targetPathNode = node.Child("target");
+							string targetPath = Execute(targetPathNode).stringVal;
+							JsonValue val = GetAtPath(targetPath);
+							
 							return val;
 						}
 					case RETURNSTMT: {
@@ -713,16 +757,18 @@ public partial class XJS {
 
 					case FUNCCALL: {
 							//Debug.Log("Calling function (" + node.Data("target") + ")" + node);
-							string target = node.Data("target");
+							Node targetPathNode = node.Child("target");
+							string target = Execute(targetPathNode).stringVal;
 							Node funcCallParams = node.Child("params");
+							//Dbg($"Calling Function {target} with {funcCallParams.NodesListed} parameter(s)");
 
 							// Optional.
 							//Node indexExpr = node.Child("indexExpr");
 							JsonArray prams = new JsonArray();
 
 							for (int i = 0; i < funcCallParams.NodesListed; i++) {
-								//Dbg($"Executing FUNCCALL {target} parameter {i}");
 								JsonValue pram = Execute(funcCallParams.Child(i));
+								//Dbg($"Executing FUNCCALL {target} parameter {{{i}}} = {{{pram}}}");
 								prams.Add(pram);
 							}
 
@@ -732,12 +778,13 @@ public partial class XJS {
 							
 								string funcName = (target.Contains(".")) 
 									? target.Substring(target.LastIndexOf('.')+1)
-									: target; 
+									: target;
+
 								func = DoGet(targetObject, funcName) as JsonFunction;
 							}
 							
 							// The function will take care of adding a frame if it needs it.
-							JsonValue result = func?.Invoke(global, prams);
+							JsonValue result = func.Invoke(global, prams);
 							//Dbg($"Invoking function {target} got {{{result}}}");
 
 							// If we got a return value, reset it to null to stop popping frames.

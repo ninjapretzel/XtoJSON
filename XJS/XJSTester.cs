@@ -93,8 +93,9 @@ namespace JsonTests {
 			{
 				JsonArray expected = new JsonArray(1, 2, 3);
 				TestRun(@"[1,2,3]", expected);
-				TestRun(@"x = []; x.Add(1) x.Add(2) x.Add(3) return x", expected);
-				TestRun(@"x = []; x.Add(1) x.Add(2) x.Add(3) x", expected);
+				TestRun(@"x = []; x.Add(1); x.Add(2); x.Add(3); return x;", expected);
+				TestRun(@"x = [] x.Add(1) x.Add(2) x.Add(3) return x", expected);
+				TestRun(@"x = [] x.Add(1) x.Add(2) x.Add(3) x", expected);
 				TestRun(@"return [1,2,3]", expected);
 				TestRun(@"x = func()=>{ return [1,2,3]; }; return x()", expected);
 			}
@@ -103,8 +104,8 @@ namespace JsonTests {
 				// An object literal and code block are ambiguous, 
 				// so to return an object literal, only the 'return' statement is valid. 
 				TestRun(@"return { x: 4, y: 5, z: 6 } ", expected);
+				TestRun(@"obj = {}; obj[""x""] = 4; obj[""y""] = 5; obj[""z""] = 6; return obj", expected);
 				TestRun(@"obj = {}; obj.x = 4 obj.y = 5 obj.z = 6 return obj", expected);
-				TestRun(@"obj = {}; obj[""x""] = 4 obj[""y""] = 5 obj[""z""] = 6 return obj", expected);
 
 			}
 		}

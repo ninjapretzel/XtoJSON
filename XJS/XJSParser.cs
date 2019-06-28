@@ -98,16 +98,29 @@ public partial class XJS {
 	public static Node ParseExprPath(this Tokenizer tok) {
 		// All paths start with a name. 
 		tok.Require(NAME);
-		// Token start = tok.Next();
 
 		Node path = new Node(PATHEXPR);
 		Node first = new Node(ATOM);
+		first.Map("const", tok.peekToken);
 
-		path.List(tok.peekToken);
+		path.List(first);
 		tok.Next();
 		
-		// TBD: Figure out the details for doing this parsing.
-
+		while (tok.At(".") || tok.At("[")) {
+			if (tok.At(".")) {
+				tok.Next();
+				Node next = new Node(ATOM);
+				tok.Require(NAME);
+				next.Map("const", tok.peekToken);
+				path.List(next);
+				tok.Next();
+			} else if (tok.At("[")) {
+				tok.Next();
+				Node next = tok.ParseExpression();
+				tok.RequireNext("]");
+				path.List(next);
+			}
+		}
 
 		return path;
 	}
@@ -695,7 +708,7 @@ public partial class XJS {
 	///		<para> Parses a value, assignment statement, or a function call </para>
 	///		<para> 
 	///			Due to the way the grammar rules work, it is difficult to determine if 
-	///			a PATH is the start of an assignment or a function call.
+	///			a PATH is the start of a value, assignment or a function call.
 	///			We don't know what it is until later on, after we get the PATH.
 	///		</para>
 	///		<para>
@@ -723,14 +736,15 @@ public partial class XJS {
 			tok.Next();
 			node.type = ASSIGN;
 		}
-		Token path = tok.ParseFixedPath();
-		Node indexExpr = null;
+		// Token path = tok.ParseFixedPath();
+		Node path = tok.ParseExprPath();
 		Node funcCallParams = null;
 
-		if (tok.At("[")) { indexExpr = tok.ParseIndexer(); }
+		// Included in ParseExprPath
+		// if (tok.At("[")) { indexExpr = tok.ParseIndexer(); }
 
 		if (tok.At("(")) {
-			// Can call indexed functions eg.. hero["heal"](12)
+			// Detect function calls
 			funcCallParams = tok.ParseParamsList();
 			node.type = FUNCCALL;
 		} else if (tok.At(ASSIGN_TOKEN)) {
@@ -747,7 +761,6 @@ public partial class XJS {
 		// Anything that is null does not get mapped.
 		node.Map("target", path);
 		node.Map("params", funcCallParams);
-		node.Map("indexExpr", indexExpr);
 
 		return node;
 	}
