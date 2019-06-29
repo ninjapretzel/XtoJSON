@@ -71,6 +71,11 @@ public static partial class XJS {
 	// <summary> Impossible token representing type for names </summary>
 	//public const string NAME = "!NAME";
 
+	/// <summary> Constant name of argNames array </summary>
+	public const string ARGNAMES = "argNames";
+	/// <summary> Constant name of args array </summary>
+	public const string ARGS = "args";
+
 	/// <summary> Regex pattern for matching names </summary>
 	public const string nameRegex = @"[a-zA-Z_\$][a-zA-Z0-9_\$]*";
 	/// <summary> Regex checker for names </summary>

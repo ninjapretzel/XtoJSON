@@ -38,7 +38,10 @@ namespace JsonTests {
 			var program = XJS.Parse(input);
 			var result = interp.Execute(program);
 
-			result.ShouldEqual(expected);
+			if (expected != null) {
+				result.ShouldEqual(expected);
+			}
+
 		}
 
 		private static void DebugRun(string input, object expected, XJS.Interpreter interp = null) {
@@ -47,7 +50,14 @@ namespace JsonTests {
 			Debug.Log(program);
 			var result = interp.Execute(program);
 
-			result.ShouldEqual(expected);
+			if (expected != null) {
+				result.ShouldEqual(expected);
+			}
+
+		}
+
+		public static void TestWarmup() {
+			TestRun(@"Debug.Log(""Hello"" + "" "" + ""World"")", null);
 		}
 
 		public static void TestBasics() {

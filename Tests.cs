@@ -73,89 +73,116 @@ namespace JsonTests {
 #if DEBUG
 	/// <summary> Class containing a small suite of tests to ensure all functionality is good. </summary>
 	public static class TestFramework {
-	
-	/// <summary> Helper method to get test methods within a given type </summary>
-	/// <param name="type"> Type to search for test methods in </param>
-	/// <returns> List of all MethodInfo in given type that are static methods with names starting with Test and no parameters. </returns>
-	public static List<MethodInfo> GetTestMethods(this Type type) {
-		var allMethods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-		var nestedTypes = type.GetNestedTypes(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
-		List<MethodInfo> tests = new List<MethodInfo>();
+		public static string successColor = "#00AA00";
+		public static string failureColor = "#BB0000";
 
-		foreach (var method in allMethods) {
-			if (method.Name.StartsWith("Test") && method.GetParameters().Count() == 0) { tests.Add(method); }
-		}
+		/// <summary> Helper method to get test methods within a given type </summary>
+		/// <param name="type"> Type to search for test methods in </param>
+		/// <returns> List of all MethodInfo in given type that are static methods with names starting with Test and no parameters. </returns>
+		public static List<MethodInfo> GetTestMethods(this Type type) {
+			var allMethods = type.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+			var nestedTypes = type.GetNestedTypes(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic);
+			List<MethodInfo> tests = new List<MethodInfo>();
 
-		foreach (var subtype in nestedTypes) {
-			tests.AddRange(subtype.GetTestMethods());
-		}
-
-		return tests;
-	}
-
-	/// <summary> Runs all of the tests, and returns a string containing information about tests passing/failing. </summary>
-	/// <returns> A log of information about the results of the tests. </returns>
-	public static string RunTests(IEnumerable<MethodInfo> tests) {
-		var empty = new object[0];
-		MemoryStream logStream = new MemoryStream();
-		Encoding encoding = Encoding.ASCII;
-		TextWriter logWriter = new StreamWriter(logStream, encoding);
-		
-		int success = 0;
-		int failure = 0;
-		Out = logWriter;
-		Log("Testing Log Follows:");
-
-		foreach (var test in tests) {
-			Log("Running (" + test.Name + ")");
-			
-			try {
-				test.Invoke(null, empty);
-				Log("\tSuccess!");
-				success++;
-				
-			} catch (TargetInvocationException e) {
-				if (e.InnerException != null) {
-					Exception ex = e.InnerException;
-					if (ex is AssertFailed) {
-						AssertFailed fail = ex as AssertFailed;
-						string type = fail.type;
-						if (type == null) { type = "Assertion"; }
-						Log("\tFailure, " + type + " Failed:\n" + fail.description);
-					} else {
-						Log("\tFailure, Exception Generated: " + ex.GetType().Name);
-						Log("\t\t" + ex.Message);
-
-					}
-					Log("\tLocation: " + ex.StackTrace);
-					Log("\tInner: " + ex.InnerException);
-					
-				}
-				failure++;
-			} catch (Exception e) {
-				Log("Unexpected Exception:\n\t" + e.GetType().Name);
-				Log("\tFull Trace: " + e.StackTrace);
-				failure++;
+			foreach (var method in allMethods) {
+				if (method.Name.StartsWith("Test") && method.GetParameters().Count() == 0) { tests.Add(method); }
 			}
-			Log("\n");
+
+			foreach (var subtype in nestedTypes) {
+				tests.AddRange(subtype.GetTestMethods());
+			}
+
+			return tests;
 		}
 
-		logWriter.Flush();
-		Out = null;
-		StringBuilder strb = new StringBuilder();
-		strb.Append(string.Format("Summary: {0} success, {1} failure\n", success, failure) );
-		strb.Append(encoding.GetString(logStream.ToArray()));
+		/// <summary> Runs all of the tests, and returns a string containing information about tests passing/failing. </summary>
+		/// <returns> A log of information about the results of the tests. </returns>
+		public static string RunTests(IEnumerable<MethodInfo> tests) {
+			var empty = new object[0];
+			MemoryStream logStream = new MemoryStream();
+			Encoding encoding = Encoding.ASCII;
+			TextWriter logWriter = new StreamWriter(logStream, encoding);
+		
+			int success = 0;
+			int failure = 0;
+			Out = logWriter;
+			Log("Testing Log Follows:");
+			long start, end, time, total;
+			total = 0;
+			foreach (var test in tests) {
+				Log("Running (" + test.Name + ")");
+			
+				start = DateTime.UtcNow.UnixTimestamp();
+				try {
+					test.Invoke(null, empty);
+					end = DateTime.UtcNow.UnixTimestamp();
+					time = (end - start);
+					total += time;
+					Log($"{time}ms");
+					Log($"\t<color={successColor}>Success!</color>");
+					
+					success++;
+				
+				} catch (TargetInvocationException e) {
+					end = DateTime.UtcNow.UnixTimestamp();
+					time = (end - start);
+					total += time;
+					Log($"{time}ms");
+					if (e.InnerException != null) {
+						Exception ex = e.InnerException;
+						if (ex is AssertFailed) {
+							AssertFailed fail = ex as AssertFailed;
+							string type = fail.type;
+							if (type == null) { type = "Assertion"; }
+							Log((end - start) + "ms");
+							Log($"\t<color={failureColor}> Failure, {type} Failed:</color>\n {fail.description}");
+						} else {
+							Log($"\t<color={failureColor}> Failure, Exception Generated:</color>" + ex.GetType().Name);
+							Log("\t\t" + ex.Message);
+
+						}
+						Log("\tLocation: " + ex.StackTrace);
+						Log("\tInner: " + ex.InnerException);
+					
+					}
+					failure++;
+				} catch (Exception e) {
+					end = DateTime.UtcNow.UnixTimestamp();
+					time = (end - start);
+					total += time;
+					Log($"{time}ms");
+					Log($"<color={failureColor}> Unexpected Exception:</color>\n\t" + e.GetType().Name);
+					Log("\tFull Trace: " + e.StackTrace);
+					failure++;
+				}
+				Log("\n");
+			}
+
+			logWriter.Flush();
+			Out = null;
+			StringBuilder strb = new StringBuilder();
+			var color = failure == 0 ? successColor : failureColor;
+
+			strb.Append($"Summary: in {total}ms, <color={color}> {success} success, {failure} failure</color>\n");
+			strb.Append(encoding.GetString(logStream.ToArray()));
 
 		
-		return strb.ToString();
-	}
+			return strb.ToString();
+		}
 
-	#region Test Framework
-	// ~180 lines to get most of Shouldly's functionality.
-	#region shouldly-like-extensions
-	/// <summary> Generates a short informative string about the type and content of an object </summary>
-	/// <param name="obj"> Object to make info about </param>
-	/// <returns> Short string with info about the object </returns>
+		private static readonly DateTime epoch = new DateTime(1970, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc);
+		[MethodImpl(MethodImplOptions.AggressiveInlining)]
+		internal static long UnixTimestamp(this DateTime date) {
+			TimeSpan diff = date.ToUniversalTime().Subtract(epoch);
+			return (long)diff.TotalMilliseconds;
+		}
+
+		#region Test Framework
+		// ~180 lines to get most of Shouldly's functionality.
+		#region shouldly-like-extensions
+		/// <summary> Generates a short informative string about the type and content of an object </summary>
+		/// <param name="obj"> Object to make info about </param>
+		/// <returns> Short string with info about the object </returns>
 #if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
 #endif
@@ -188,83 +215,83 @@ namespace JsonTests {
 		// I really wish this could be solved properly with a generic method...
 		// Turns out that generic methods don't keep ValueTypes as ValueTypes without splitting into two methods.
 		/// <summary> Asserts two string values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this string v1, string v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two bool values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this bool v1, bool v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two decimal values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this decimal v1, decimal v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two double values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this double v1, double v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two float values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this float v1, float v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two char  values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this char v1, char v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two byte values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this byte v1, byte v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two short values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this short v1, short v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two int values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this int v1, int v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two long values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this long v1, long v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 
 		/// <summary> Asserts two sbyte values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this sbyte v1, sbyte v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two ushort values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this ushort v1, ushort v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two uint values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this uint v1, uint v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 		/// <summary> Asserts two ulong values are equal </summary> <param name="v1"> First Value </param> <param name="v2"> Second Value</param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this ulong v1, ulong v2) { if (!(v1 == v2)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(v1, v2)); } }
 	
 		/// <summary> Tests two objects, and throws an exception if they are not equal by == in one direction (obj == other) </summary>
 		/// <param name="obj"> Object to test </param>
 		/// <param name="other"> Object to test against </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe(this object obj, object other) {
 			if (!(obj == other)) { throw new AssertFailed("ShouldBe", SHOULD_BE_FAILED.Fmt(obj.Info(), other.Info())); }
 		}
@@ -276,9 +303,9 @@ namespace JsonTests {
 		/// <typeparam name="T"> First type (expected of <paramref name="obj"/>) </typeparam>
 		/// <param name="obj"> First object for comparison. Should be of type <paramref name="T"/> </param>
 		/// <param name="other"> Second object for comparison. </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe<T>(this object obj, object other) {
 			Type type = typeof(T);
 			if (!(obj is T)) { throw new AssertFailed("ShouldBe<>", "Value\n\t" + obj.Info() + "\nShould be castable to type\n\t" + type.Name + "\nBut is not."); }
@@ -305,9 +332,9 @@ namespace JsonTests {
 		/// <typeparam name="T2"> Second type (expected of <paramref name="other"/>) </typeparam>
 		/// <param name="obj"> First object for comparison. Should be of type <paramref name="T"/> </param>
 		/// <param name="other"> Second object for comparison. Should be of type <paramref name="T2"/> </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBe<T, T2>(this object obj, object other) {
 			Type type = typeof(T);
 			Type type2 = typeof(T2);
@@ -342,9 +369,9 @@ namespace JsonTests {
 		/// <summary> Tests two things, and throws an exception if they are equal by != in one direction (obj != other) </summary>
 		/// <param name="obj"> Object to test </param>
 		/// <param name="other"> Object to test against </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldNotBe(this object obj, object other) {
 			if (!(obj != other)) { throw new AssertFailed("ShouldNotBe", "Values\n\t" + obj.Info() + "\nand\n\t" + other.Info() + "\nShould have been !=, but were not."); }
 		}
@@ -352,9 +379,9 @@ namespace JsonTests {
 		/// <summary> Tests two things, and throws an exception if they are not equal by Equals in one direction (obj.Equals(other)) </summary>
 		/// <param name="obj"> Object to test </param>
 		/// <param name="other"> Object to test against </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldEqual(this object obj, object other) {
 			if (!obj.Equals(other)) { throw new AssertFailed("ShouldEqual", "Values\n\t" + obj.Info() + "\nand\n\t" + other.Info() + "\nShould have been .Equal(), but were not."); }
 		}
@@ -364,9 +391,9 @@ namespace JsonTests {
 		/// <param name="coll"> Collection to test </param>
 		/// <param name="other"> Expected collection to pair with </param>
 		/// <param name="predicate"> Predicate to derermine if the test passes. </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldEachMatch<T>(this IEnumerable<T> coll, IEnumerable<T> other, Func<T, T, bool> predicate) {
 			var ita = coll.GetEnumerator();
 			var itb = other.GetEnumerator();
@@ -397,27 +424,27 @@ namespace JsonTests {
 		/// <summary> Tests two things, and throws an exception if they are not equal by Equals in one direction (!obj.Equals(other)) </summary>
 		/// <param name="obj"> Object to test </param>
 		/// <param name="other"> Object to test against </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldNotEqual(this object obj, object other) {
 			if (obj.Equals(other)) { throw new AssertFailed("ShouldNotEqual", "Values\n\t" + obj.Info() + "\nand\n\t" + other.Info() + "\nShould not have been .Equal(), but were."); }
 		}
 
 		/// <summary> Tests a boolean expression for truthiness </summary>
 		/// <param name="b"> Expression expected to be true </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBeTrue(this bool b) {
 			if (!b) { throw new AssertFailed("ShouldBeTrue", "Expression should have been true, but was false"); }
 		}
 
 		/// <summary> Tests a boolean expression for falsity </summary>
 		/// <param name="b"> Expression expected to be false </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBeFalse(this bool b) {
 			if (b) { throw new AssertFailed("ShouldBeFalse", "Expression should have been false, but was true"); }
 		}
@@ -426,9 +453,9 @@ namespace JsonTests {
 		/// <typeparam name="T"> Generic type </typeparam>
 		/// <param name="a"> First array </param>
 		/// <param name="b"> Second (expected) array </param>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldBeSame<T>(this T[] a, T[] b) {
 			if (a == null) { throw new AssertFailed("ShouldBeSame", "Arrays cannot be null- source array was null!"); }
 			if (b == null) { throw new AssertFailed("ShouldBeSame", "Arrays cannot be null- expected array was null!"); }
@@ -441,9 +468,9 @@ namespace JsonTests {
 		}
 
 		/// <summary> Throws an AssertFailed. Marks a line of code as something that should not be reached. </summary>
-	#if COMP_SERVICES
+#if COMP_SERVICES
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-	#endif
+#endif
 		public static void ShouldNotRun() {
 			throw new AssertFailed("ShouldNotRun", "Line of code invoking this method should not have been reached.");
 		}
@@ -456,18 +483,18 @@ namespace JsonTests {
 	#if DEBUG
 		/// <summary> Output stream to write to, if assigned. </summary>
 		internal static TextWriter Out = null;
-	#endif
+#endif
 	/// <summary> Debug helper method </summary>
 	/// <param name="message"> Message object to output to the assigned outstream </param>
 	#if !UNITY // Note: Unity has control over this symbol, so this function shouldn't be marked Conditional in some cases when unity uses DEBUG
 		[Conditional("DEBUG")]
-	#endif
+#endif
 		public static void Log(object message) {
 	#if DEBUG
 			if (Out != null) {
 				Out.WriteLine(message); 
 			}
-	#endif
+#endif
 		}
 
 		private class AssertFailed : Exception {

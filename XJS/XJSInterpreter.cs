@@ -348,7 +348,7 @@ public partial class XJS {
 
 			// Set up a debug object... (Debug.Log, wew)
 			var proxy = global["Debug"] = new JsonObject();
-			proxy["Log"] = new JsonFunction((context, prams)=>{Debug.Log(prams[0]); return JsonNull.instance; });
+			proxy["Log"] = new JsonFunction((context, prams)=>{Debug.Log("XJS Debug Log: \n" + prams[0].ToString()); return JsonNull.instance; });
 
 			frames = new Stack<Frame>();
 		}
@@ -443,8 +443,8 @@ public partial class XJS {
 				}
 				args.AddAll(prams);
 
-				next.Declare("argNames", argNames);
-				next.Declare("args", args);
+				next.Declare(ARGNAMES, argNames);
+				next.Declare(ARGS, args);
 				next.Push();
 
 				// Push stackframe onto stack
