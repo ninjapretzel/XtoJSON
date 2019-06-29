@@ -32,7 +32,7 @@ namespace JsonTests {
 
 #if DEBUG
 	public static class XJS_Tests {
-
+		
 		private static void TestRun(string input, object expected, XJS.Interpreter interp = null) {
 			if (interp == null) { interp = new XJS.Interpreter(); }
 			var program = XJS.Parse(input);

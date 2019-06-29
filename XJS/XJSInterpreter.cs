@@ -351,6 +351,7 @@ public partial class XJS {
 			proxy["Log"] = new JsonFunction((context, prams)=>{Debug.Log("XJS Debug Log: \n" + prams[0].ToString()); return JsonNull.instance; });
 
 			frames = new Stack<Frame>();
+			frames.Push(new Frame(global));
 		}
 
 		/// <summary> Turns a method info and an object to bind it to into a JsonFunction that can be called from inside of a script. </summary>
@@ -531,13 +532,10 @@ public partial class XJS {
 				switch (node.type) {
 
 					case PROGRAM: { // Entire program 
-							// TBD: Request imports from context, declare export references. 
-							frames.Push(new Frame(global));
+							// TBD: Request imports from context, declare export references
 							var result = Execute(node.Child("stmts"));
 
 							// TBD: Register exports
-							frames.Pop();
-
 							return result;
 						}
 
@@ -566,7 +564,7 @@ public partial class XJS {
 							Node expr = node.Child("expr");
 							JsonValue result = Execute(expr);
 							frame.Declare(target, result);
-							break;
+							return result;
 						}
 
 					case ARRAYLITERAL: { // Array Literal, obviously. 

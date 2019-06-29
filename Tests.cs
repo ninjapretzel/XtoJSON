@@ -55,6 +55,7 @@ namespace JsonTests {
 				Test(typeof(Json_Tests));
 
 				Test(typeof(XJS_Tests));
+				Test(typeof(XJS_Interp_Tests));
 
 			}
 			wasCompiling = isCompiling;
