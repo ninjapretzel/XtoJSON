@@ -649,6 +649,24 @@ public partial class XJS {
 					case OBJECTLITERAL: { // Object Literal, obviously. 
 							JsonObject obj = new JsonObject();
 							
+							if (node.DataListed > 0) {
+								foreach (var name in node.dataList) {
+									var value = GetAtPath(name);
+									obj[name] = value;
+								}
+							}
+							
+							if (node.NodesListed > 0) {
+								foreach (var spread in node.nodeList) {
+									var it = Execute(spread.Child("target"));
+									if (it.isObject) {
+										foreach (var pair in it as JsonObject) {
+											obj[pair.Key] = pair.Value;
+										}
+									}
+								}
+							}
+
 							if (node.NodesMapped > 0) {
 								foreach (var pair in node.nodeMap) {
 									var name = pair.Key;
@@ -656,8 +674,7 @@ public partial class XJS {
 									obj[name] = Execute(expr);
 								}
 							}
-
-							// TBD: stitched/splatted literals 
+							
 
 							return obj; 
 						}

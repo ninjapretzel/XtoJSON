@@ -819,20 +819,30 @@ public partial class XJS {
 
 		while (!tok.At("}")) {
 
-			tok.Require(NAME);
-			var name = tok.peekToken;
-			tok.Next();
-			
-			if (tok.At(":")) {
-				tok.RequireNext(":");
+			if (tok.At("...")) {
 
-				var expr = tok.ParseExpression();
-
-				obj.Map(name.content, expr);
+				tok.Next();
+				Node spread = new Node(SPREAD);
+				spread.Map("target", tok.ParseFromName());
+				obj.List(spread);
+				
 			} else {
-				obj.List(name);
-			}
+
+				tok.Require(NAME);
+				var name = tok.peekToken;
+				tok.Next();
 			
+				if (tok.At(":")) {
+					tok.RequireNext(":");
+
+					var expr = tok.ParseExpression();
+
+					obj.Map(name.content, expr);
+				} else {
+					obj.List(name);
+				}
+			
+			}
 			if (tok.At(",")) {
 				tok.Next();
 			}

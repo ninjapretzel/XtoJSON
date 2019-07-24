@@ -98,13 +98,13 @@ namespace JsonTests {
 "the quick brown fox jumps over the lazy dog");
 		}
 
-		public static void TestLiterals() {
+		public static void TestBasicLiterals() {
 			{
 				JsonArray expected = new JsonArray();
 				TestRun(@"[]", expected);
 				TestRun(@"return []", expected);
-				TestRun(@"x = func () => { return [] }; x()", expected);
 				TestRun(@"x = func () => { [] }; x()", expected);
+				TestRun(@"x = func () => { return [] }; x()", expected);
 			}
 			{
 				JsonArray expected = new JsonArray(1, 2, 3);
@@ -116,16 +116,60 @@ namespace JsonTests {
 				TestRun(@"x = func()=>{ return [1,2,3]; }; return x()", expected);
 			}
 			{
+				JsonObject expected = new JsonObject();
+				//TestRun(@"{}", expected);
+				TestRun(@"return {}", expected);
+				//TestRun(@"x = func () => { {} }; x()", expected);
+				TestRun(@"x = func () => { return {} }; x()", expected);
+
+			}
+			{
 				JsonObject expected = new JsonObject("x", 4, "y", 5, "z", 6);
 				// An object literal and code block are ambiguous, 
 				// so to return an object literal, only the 'return' statement is valid. 
 				TestRun(@"return { x: 4, y: 5, z: 6 } ", expected);
 				TestRun(@"obj = {}; obj[""x""] = 4; obj[""y""] = 5; obj[""z""] = 6; return obj", expected);
 				TestRun(@"obj = {}; obj.x = 4 obj.y = 5 obj.z = 6 return obj", expected);
-
+				TestRun(@"x=4;y=5;z=6;obj = {x,y,z}", expected);
+				
 			}
-			
 		}
+
+
+		public static void TestArraySpreading() {
+			{
+				JsonArray expected = new JsonArray(1, 2, 3, 4, 5, 6);
+				TestRun(@"
+var a = [1,2,3]
+var b = [4,5,6]
+var c = [...a, ...b]", expected);
+
+				TestRun(@"
+var a = [3,4]
+var b = [1,2,...a,5,6]
+", expected);
+			}
+		}
+
+
+		public static void TestObjectSpreading() {
+			{
+				JsonObject expected = new JsonObject("x", 4, "y", 5, "z", 6);
+				TestRun(@"
+a = { x:4, y:5 }
+b = { z:6 }
+c = {...a, ...b }
+
+", expected);
+				TestRun(@"
+var a = { x:1, y:5, z:3 }
+var b = { x:4 }
+var y = 2;
+var c = { y, ...a, ...b, z:6 };
+", expected);
+			}
+		}
+
 
 		public static void TestPaths() {
 			{
@@ -179,6 +223,17 @@ else { ""I can't count that high."" }
 				TestRun("x=7;\n"+counter, "seven");
 				TestRun("x=999;\n"+counter, "I can't count that high.");
 				TestRun("x=9913219;\n"+counter, "I can't count that high.");
+
+				TestRun(@"
+x = ""five"";
+y = 5
+if (y == 5) { 
+	return x;
+} else {
+	return 12;
+}
+thisGetSkipped();
+", expected);
 			}
 		}
 
@@ -277,16 +332,6 @@ fn(1, 2, 3, 4, 5);
 			}
 		}
 
-
-		public static void TestSpreading() {
-			{
-				JsonArray expected = new JsonArray(1,2,3,4,5,6);
-				TestRun(@"
-var a = [1,2,3]
-var b = [4,5,6]
-var c = [...a, ...b]", expected);
-			}
-		}
 
 	}
 
