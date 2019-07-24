@@ -35,7 +35,7 @@ public static partial class XJS {
 	/// <summary> Punctuation of the language, with larger constructs checked first. </summary>
 	public static readonly string[] punct = {
 		// Size 3
-		">>>", "===", ">>=", "<<=",
+		">>>", "===", ">>=", "<<=", "...",
 
 		// Size 2
 		"+=", "-=", "/=", "*=", "%=", "^=", "|=", "&=",
@@ -158,6 +158,8 @@ public static partial class XJS {
 		VARLIST,
 		/// <summary> Expression that resolves to a path </summary>
 		PATHEXPR,
+		/// <summary> Placeholder to spread an iterable </summary>
+		SPREAD,
 
 	}
 

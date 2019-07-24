@@ -149,7 +149,7 @@ public partial class XJS {
 		int safetyWall = 0;
 		while (!(tok.Done || tok.At("}"))) {
 			stmts.List(tok.ParseStatement());
-			if (++safetyWall > SAFETYWALL) { Debug.LogWarning("Broke out of STMTLIST safetywall!\n" + tok); break; }
+			if (++safetyWall > SAFETYWALL) { Debug.LogWarning("Broke out of STMTLIST debug safetywall!\n" + tok); break; }
 		}
 
 		return stmts;
@@ -854,7 +854,17 @@ public partial class XJS {
 		tok.RequireNext("[");
 
 		while (!tok.At("]")) {
-			arr.List(tok.ParseExpression());
+			if (tok.At("...")) {
+				tok.Next();
+				Node spread = new Node(SPREAD);
+				spread.Map("target", tok.ParseFromName());
+				arr.List(spread);
+
+			} else {
+				arr.List(tok.ParseExpression());
+
+			}
+
 			// Consume but do not require commas. 
 			if (tok.At(",")) { tok.Next(); }
 		}

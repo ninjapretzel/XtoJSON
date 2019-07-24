@@ -81,6 +81,10 @@ public partial class XJS {
 			/// <param name="val"> Value to initialize new field to </param>
 			public void Declare(string name, JsonValue val) { topContext[name] = val; }
 
+			/// <summary> Adds a scope block on top of all existing scopes. </summary>
+			/// <param name="obj"> scope block to add </param>
+			public void Push(JsonObject obj) { Add(obj); }
+
 			/// <summary> Adds another scope block on top of all existing scopes. </summary>
 			public void Push() { Add(new JsonObject()); }
 
@@ -518,7 +522,61 @@ public partial class XJS {
 		public static BinaryOp LT_OP = (lhs, rhs) => { return (lhs < rhs); };
 		public static BinaryOp LE_OP = (lhs, rhs) => { return (lhs <= rhs); };
 
+		/// <summary> Returns an <see cref="IEnumerable{T}"/> of <see cref="JsonValue"/> which allows top-level statements in a program to be executed one at a time </summary>
+		/// <param name="node"> Node to execute. </param>
+		/// <returns> <see cref="IEnumerator{T}"/> of <see cref="JsonValue"/> for every result of each statement. </returns>
+		/// <remarks>
+		/// <paramref name="node"/> must be of <see cref="Node.type"/> == <see cref="XJS.Nodes.PROGRAM"/>. 
+		/// </remarks>
+		public IEnumerator<JsonValue> Stepper(Node node) {
+			if (exception != null) { yield break; }
+			if (node == null) {
+				Debug.LogWarning("Atchung! Stepping on null node!");
+				yield break;
+			}
 
+			switch (node.type) {
+				case PROGRAM: {
+						JsonObject context = new JsonObject();
+						Node stmts = node.Child("stmts");
+						
+						JsonValue last = null;
+						for (int i = 0; i < stmts.NodesListed; i++) {
+							
+							frame.Push(context);
+							last = Execute(stmts.Child(i));
+							frame.Pop();
+
+							yield return last;
+							// Respect any ongoing flow-control, which will escape the scope blocks
+							if (breakTarget != null || continueTarget != null) { break; }
+							if (returnValue != null) { yield return returnValue; yield break; }
+							// Any returning implies there will be a frame removed anyway, so this doesn't need to pop the frame from the stack...
+						}
+						
+
+						yield break;
+					}
+				default: {
+						yield return Execute(node);
+						yield break;
+					}
+			}
+
+		}
+
+		/// <summary> Executes a JsonFunction in the context of this interpreter. </summary>
+		/// <param name="fn"> Function to execute. </param>
+		/// <param name="args"> Arguments to pass to function </param>
+		/// <returns> Result of function's execution. </returns>
+		public JsonValue Execute(JsonFunction fn, JsonArray args = null) {
+			if (args == null) { args = new JsonArray(); }
+			return fn.Invoke(global, args);
+		}
+		
+		/// <summary> Fully executes a program tree. </summary>
+		/// <param name="node"> Root node of program tree to execute. </param>
+		/// <returns> Result of execution </returns>
 		public JsonValue Execute(Node node) {
 			// Quickly pop back up the stack if there is an exception
 			if (exception != null) { return null; }
@@ -573,7 +631,16 @@ public partial class XJS {
 							if (node.NodesListed > 0) {
 								// TBD: stitched/splatted arrays
 								foreach (var child in node.nodeList) {
-									arr.Add(Execute(child));
+									if (child.type == SPREAD) {
+										var it = Execute(child.Child("target"));
+										if (it.isArray) {
+											arr.AddAll(it as JsonArray);
+										}
+
+									} else {
+
+										arr.Add(Execute(child));
+									}
 								}
 							}
 							
