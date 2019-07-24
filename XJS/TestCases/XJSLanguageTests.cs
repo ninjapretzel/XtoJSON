@@ -278,6 +278,16 @@ fn(1, 2, 3, 4, 5);
 		}
 
 
+		public static void TestSpreading() {
+			{
+				JsonArray expected = new JsonArray(1,2,3,4,5,6);
+				TestRun(@"
+var a = [1,2,3]
+var b = [4,5,6]
+var c = [...a, ...b]", expected);
+			}
+		}
+
 	}
 
 
