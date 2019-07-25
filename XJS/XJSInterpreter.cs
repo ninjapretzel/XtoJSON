@@ -526,7 +526,7 @@ public partial class XJS {
 		/// <remarks>
 		/// <paramref name="node"/> must be of <see cref="Node.type"/> == <see cref="XJS.Nodes.PROGRAM"/>. 
 		/// </remarks>
-		public IEnumerator<JsonValue> Stepper(Node node) {
+		public IEnumerator<JsonValue> Stepper(Node node, JsonObject context = null) {
 			if (exception != null) { yield break; }
 			if (node == null) {
 				Debug.LogWarning("Atchung! Stepping on null node!");
@@ -535,15 +535,17 @@ public partial class XJS {
 
 			switch (node.type) {
 				case PROGRAM: {
-						JsonObject context = new JsonObject();
+						if (context == null) { context = new JsonObject(); }
+						Frame frame = new Frame(context);
+
 						Node stmts = node.Child("stmts");
-						
+
 						JsonValue last = null;
 						for (int i = 0; i < stmts.NodesListed; i++) {
-							
-							frame.Push(context);
+
+							frames.Push(frame);
 							last = Execute(stmts.Child(i));
-							frame.Pop();
+							frames.Pop();
 
 							yield return last;
 							// Respect any ongoing flow-control, which will escape the scope blocks
