@@ -1,10 +1,8 @@
-using UnityEngine;
 using System;
 using System.Collections.Generic;
-
-using static XJS.Nodes;
 using System.Reflection;
 using Lib;
+using static XJS.Nodes;
 
 public partial class XJS {
 

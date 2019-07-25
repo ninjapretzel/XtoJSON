@@ -1,9 +1,5 @@
-using UnityEngine;
-using System;
-using System.Collections;
-using System.Collections.Generic;
-using Lib;
 using System.Runtime.CompilerServices;
+using Lib;
 
 public static class XJSHelpers {
 	/// <summary> Checks the string starting at position = startIndex to see if check directly matches the string from that position. </summary>
@@ -45,11 +41,11 @@ public static class XJSHelpers {
 			|| (c >= '0' && c <= '9'));
 	}
 
-	public static void TestMatchAt() {
+	public static void QuickTestMatchAt() {
 		string src = "ayy bee cee dee eie eff gee. This bee movie is the bees knees";
 		string bee = "bee";
 		for (int i = 0; i < src.Length; i++) {
-			Debug.Log("Checking [" + src + "] at " + i + " : " + src.MatchAt(i, bee));
+			XJS.Debug.Log("Checking [" + src + "] at " + i + " : " + src.MatchAt(i, bee));
 		}
 	}
 

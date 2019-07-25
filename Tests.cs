@@ -20,6 +20,7 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 #endif
 
+
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -43,12 +44,8 @@ namespace JsonTests {
 		private bool wasCompiling = false;
 		public void Update() {
 			bool isCompiling =
-#if UNITY_EDITOR
 				EditorApplication.isCompiling;
-#else
-				false;
-#endif
-
+			
 			if (go || (goOnRecompile && wasCompiling && !isCompiling)) {
 				go = false;
 

@@ -1,31 +1,3 @@
-#if UNITY_2018 || UNITY_2019
-#define UNITY
-#endif
-// Unity detection
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019
-#define UNITY
-#if UNITY_2017 || UNITY_2018 || UNITY_2019
-#define COMP_SERVICES
-using System.Runtime.CompilerServices;
-
-#endif
-// Use UnityEngine's provided utilities.
-using UnityEngine;
-
-
-#else
-// Hook into some other useful diagnostic stuff
-#define COMP_SERVICES
-using System.Runtime.CompilerServices;
-#endif
-
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using System.Collections.Concurrent;
 using static JsonTests.TestFramework;
 
 namespace JsonTests {
@@ -47,7 +19,7 @@ namespace JsonTests {
 		private static void DebugRun(string input, object expected, XJS.Interpreter interp = null) {
 			if (interp == null) { interp = new XJS.Interpreter(); }
 			var program = XJS.Parse(input);
-			Debug.Log(program);
+			XJS.Debug.Log(program);
 			var result = interp.Execute(program);
 
 			if (expected != null) {

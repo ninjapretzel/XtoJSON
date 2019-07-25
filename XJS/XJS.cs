@@ -1,12 +1,45 @@
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
+#define UNITY
+
+#if UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
+#define COMP_SERVICES
+// Early unity doesn't have access to this namespace.
+using System.Runtime.CompilerServices;
+#endif
+
 using UnityEngine;
-using System;
-using System.Collections;
-using System.Collections.Generic;
+#else
+#define COMP_SERVICES
+#endif
+
 using System.Text.RegularExpressions;
-using System.Linq;
 
 /// <summary> Container class for XJS language </summary>
 public static partial class XJS {
+
+	public static class Debug {
+		public static void Log(object o) {
+			#if UNITY
+			UnityEngine.Debug.Log(o);
+			#else
+			System.Console.WriteLine(o);
+			#endif
+		}
+		public static void LogWarning(object o) {
+			#if UNITY
+			UnityEngine.Debug.LogWarning(o);
+			#else
+			System.Console.WriteLine($"warning {o}");
+			#endif
+		}
+		public static void LogError(object o) {
+			#if UNITY
+			UnityEngine.Debug.LogError(o);
+			#else
+			System.Console.WriteLine($"error {o}");
+			#endif
+		}
+	}
 
 	/// <summary> Parses program text into a tree representing the program </summary>
 	/// <param name="script"> Text of program to parse </param>
