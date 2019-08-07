@@ -60,7 +60,7 @@ namespace JsonTests {
 
 		private static void Test(Type type) {
 			Debug.Log($"Testing {type}");
-			Debug.Log(RunTests(type.GetTestMethods()));
+			Debug.Log($"{type} {RunTests(type.GetTestMethods())}");
 		}
 #endif
 
