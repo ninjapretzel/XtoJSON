@@ -15,6 +15,13 @@ public partial class XJS {
 		Node prog = new Node(PROGRAM);
 
 		prog.Map("imports-exports", tok.ParseImportsExports());
+
+		//if (tok.At("async")) {
+		//	prog.Map("async", "true");
+		//	tok.Next();
+		//	tok.RequireNext(";");
+		//}
+
 		prog.Map("stmts", tok.ParseStatementList());
 
 		return prog;
@@ -165,6 +172,7 @@ public partial class XJS {
 		else if (tok.At("while")) { return tok.ParseWhileLoop(); }
 		else if (tok.At("break")) { return tok.ParseBreakStmt(); }
 		else if (tok.At("continue")) { return tok.ParseContinueStmt(); }
+		else if (tok.At("await")) { return tok.ParseAwaitStmt(); }
 		else if (tok.At(":")) {
 			
 			string label = tok.ParseLabel();
@@ -691,8 +699,25 @@ public partial class XJS {
 
 			return tok.ParseArray();
 		} else if (tok.At("func")) {
+			//bool asyncFunc = tok.At("async");
 
-			return atom.Map("func", tok.ParseFunc());
+			//if (asyncFunc) {
+			//	tok.Next();
+			//	tok.Require("func");
+			//}
+		
+			Node funcNode = atom.Map("func", tok.ParseFunc());
+			//if (asyncFunc) {
+			//	funcNode.Map("async", "true");
+			//}
+
+			return funcNode;
+		} else if (tok.At("await")) {
+			Node awaitNode = new Node(AWAIT);
+			tok.Next();
+			awaitNode.Map("expr", tok.ParseExpression());
+
+			return awaitNode;
 		} else {
 			Node check = atom.Map("inner", tok.ParseFromName());
 			if (check.type == VALUE) { return check; }
@@ -934,6 +959,20 @@ public partial class XJS {
 		tok.RequireNext(")");
 
 		return vars;
+	}
+
+	/// <summary> Parses an await statement. </summary>
+	/// <param name="tok"> Token Stream to read from </param>
+	/// <returns> Program node built from tokenizer stream </returns>
+	public static Node ParseAwaitStmt(this Tokenizer tok) {
+		Node awaiter = new Node(AWAIT);
+		tok.Require("await");
+		tok.Next();
+
+		awaiter.Map("expr", tok.ParseExpression());
+		awaiter.Map("rest", tok.ParseStatementList());
+
+		return awaiter;
 	}
 
 

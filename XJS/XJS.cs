@@ -56,6 +56,7 @@ public static partial class XJS {
 		"var", "as",
 		"import", "export",
 		"func", "function",
+		"async", "await",
 
 		"return",
 		"if", "else",
@@ -193,7 +194,8 @@ public static partial class XJS {
 		PATHEXPR,
 		/// <summary> Placeholder to spread an iterable </summary>
 		SPREAD,
-
+		/// <summary> Await proxy node </summary>
+		AWAIT,
 	}
 
 

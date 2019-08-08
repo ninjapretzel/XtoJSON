@@ -1,3 +1,4 @@
+using System.Collections;
 using static JsonTests.TestFramework;
 
 namespace JsonTests {
@@ -304,6 +305,32 @@ fn(1, 2, 3, 4, 5);
 			}
 		}
 
+
+		private static IEnumerator CountToTen() {
+			yield return 1;
+			yield return 2;
+			yield return 3;
+			yield return 4;
+			yield return 5;
+			yield return 6;
+			yield return 7;
+			yield return 8;
+			yield return 9;
+			yield return 10;
+		}
+		
+		private static IEnumerator CountToTenAFewTimes() {
+			yield return CountToTen();	
+			yield return CountToTen();	
+			yield return CountToTen();	
+		}
+
+		public static void TestPromisesFromExternalIEnumerator() {
+			XJS.Interpreter interpreter = new XJS.Interpreter();
+			interpreter.LoadMethods(typeof(XJS_Tests), "CountToTenAFewTimes", "CountToTen");
+			
+			
+		}
 
 	}
 

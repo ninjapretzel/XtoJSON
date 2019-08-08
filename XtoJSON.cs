@@ -82,6 +82,8 @@ public enum JsonType {
 	Null,
 	/// <summary> Represents a function value </summary>
 	Function,
+	/// <summary> Represents an incomplete value </summary>
+	Promise,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -581,6 +583,7 @@ public abstract class JsonValue {
 	}
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -680,6 +683,135 @@ public class JsonFunction : JsonValue {
 
 	/// <inheritdoc />
 	public override string ToString() { return "func()=>{}"; }
+}
+
+
+////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+//JsonPromise
+/// <summary> Class that acts as a Unity-style Coroutine with JS-like resolve/reject pattern </summary>
+public class JsonPromise : JsonValue, IEnumerator {
+
+	/// <summary> Delegate for intercepting otherwise unhandled rejections </summary>
+	public static Action<Exception> UnhandledRejectionHandler;
+	
+	/// <summary> Resolved value </summary>
+	private JsonValue value;
+	/// <summary> Wrapped IEnumerator used for scheduling and lazy execution </summary>
+	private IEnumerator wrapped;
+	/// <summary> Callback to fire when resolved </summary>
+	public Action<JsonValue> resolve;
+	/// <summary> Callback to fire when failed </summary>
+	public Action<Exception> reject;
+
+	/// <summary> True if this promise has finished successfully. </summary>
+	public bool resolved { get; private set; }
+	/// <summary> True if this promise has finished with error. </summary>
+	public bool rejected { get; private set; }
+	/// <summary> Has this promise finished at all? </summary>
+	public bool finished { get { return resolved || rejected; } }
+
+	/// <summary> Creates a JsonPromise that resolves when the IEnumerator completes </summary>
+	/// <param name="wrapped"> IEnumerator that is wrapped and (hopefully) yields a value convertable to JsonValue when finished. </param>
+	/// <param name="resolve"> Callback to invoke upon successful completion </param>
+	/// <param name="reject"> Callback to invoke upon failure </param>
+	public JsonPromise(IEnumerator wrapped, Action<JsonValue> resolve = null, Action<Exception> reject = null) {
+		this.wrapped = wrapped;
+		this.resolve = resolve;
+		this.reject = reject;
+		resolved = false;
+		rejected = false;
+	}
+
+	/// <summary> Creates a pre-resolved JsonPromise. </summary>
+	/// <param name="value"> Resolved value </param>
+	public JsonPromise(JsonValue value) {
+		if (ReferenceEquals(value, null)) { value = JsonNull.instance; }
+		else { this.value = value; }
+		resolved = true;
+		rejected = false;
+	}
+	
+	/// <inheritdoc />
+	public bool MoveNext() {
+		try {
+			if (resolved || rejected) {
+				throw new InvalidOperationException("Promise is already resolved or rejected.");
+			}
+
+			if (Current is IEnumerator) {
+				IEnumerator inside = Current as IEnumerator;
+				bool insideMore = inside.MoveNext();
+				if (insideMore) { return true; }
+			}
+
+			bool more = wrapped.MoveNext();
+
+			if (!more) {
+				object result = Current;
+				value = result as JsonValue;
+				if (ReferenceEquals(value, null) && result != null) {
+					// JsonType expected = Json.ExpectedReflectedType(result.GetType());
+					try { value = JsonReflector.Reflect(result); } catch { }
+				}
+				try { resolve?.Invoke(value); } catch { }
+				resolved = true;
+			}
+			
+			return more;
+			
+		} catch (Exception e) {
+			rejected = true;
+			if (reject != null) {
+				try { reject(e); } catch { }
+			} else {
+				if (UnhandledRejectionHandler == null) {
+					throw new Exception("Unhandled Rejection", e);
+				} else {
+					UnhandledRejectionHandler.Invoke(e);
+				}
+
+			}
+			
+			return false;
+		}
+		
+	}
+
+	/// <inheritdoc />
+	public void Reset() { throw new InvalidOperationException("Cannot reset a Promise"); }
+
+	/// <inheritdoc />
+	public object Current { 
+		get {
+			// Promise may have resolved to null via null proxy. 
+			if (!ReferenceEquals(value, null)) { return value; }
+			try { return wrapped.Current; } catch { return null; } 
+		}
+	}
+
+	/// <summary> </summary>
+	/// <param name="fn"></param>
+	public void Then(JsonFunction onResolve, JsonFunction onReject) {
+		resolve += (result) => { 
+			onResolve.Invoke(null, new JsonArray(result)); 
+		};
+		reject += (error) => {
+			onReject.Invoke(null, new JsonArray(error.GetType().ToString(), error.Message));
+		};
+	}
+	
+	
+	/// <inheritdoc />
+	public override JsonType JsonType { get { return JsonType.Promise; } }
+
+	/// <inheritdoc />
+	public override string PrettyPrint() { return "promise..."; }
+
+	/// <inheritdoc />
+	public override string ToString() { return "promise..."; }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////

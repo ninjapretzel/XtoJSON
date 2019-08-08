@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using Lib;
@@ -15,6 +16,23 @@ public partial class XJS {
 	/// <summary> Class holding the logic for interpreting a program tree </summary>
 	public class Interpreter {
 
+		public static BinaryOp ADD_OP = (lhs, rhs) => { return lhs + rhs; };
+		public static BinaryOp SUB_OP = (lhs, rhs) => { return lhs - rhs; };
+
+		public static BinaryOp MUL_OP = (lhs, rhs) => { return lhs * rhs; };
+		public static BinaryOp DIV_OP = (lhs, rhs) => { return lhs / rhs; };
+		public static BinaryOp MOD_OP = (lhs, rhs) => { return lhs / rhs; };
+
+		public static BinaryOp AND_OP = (lhs, rhs) => { return lhs && rhs; };
+		public static BinaryOp OR_OP = (lhs, rhs) => { return lhs || rhs; };
+
+		public static BinaryOp EQ_OP = (lhs, rhs) => { return (lhs == rhs); };
+		public static BinaryOp NE_OP = (lhs, rhs) => { return (lhs != rhs); };
+		public static BinaryOp GT_OP = (lhs, rhs) => { return (lhs > rhs); };
+		public static BinaryOp GE_OP = (lhs, rhs) => { return (lhs >= rhs); };
+		public static BinaryOp LT_OP = (lhs, rhs) => { return (lhs < rhs); };
+		public static BinaryOp LE_OP = (lhs, rhs) => { return (lhs <= rhs); };
+		
 		/// <summary> Class to keep track of contexts and scopes </summary>
 		public class Frame : System.Collections.Generic.List<JsonObject> {
 
@@ -99,14 +117,17 @@ public partial class XJS {
 				return str.ToString();
 			}
 		}
+		
 
 		/// <summary> The global object reference. Always available, via 'global.xyz' </summary>
 		public JsonObject global;
 		
-		/// <summary> Stack Frame History (of function calls) </summary>
+		/// <summary> Current Stack Frame History for a given context </summary>
 		public Stack<Frame> frames;
 		/// <summary> Current Frame </summary>
 		public Frame frame { get { return frames.Peek(); } }
+
+		public Stack<Frame> defaultFrames;
 
 		/// <summary> Current Break target label. Null signifies normal execution. </summary>
 		public string breakTarget = null;
@@ -123,7 +144,44 @@ public partial class XJS {
 		/// <summary> Exception generated, if any </summary>
 		public Exception exception = null;
 
+		/// <summary> Event loop </summary>
+		public Queue<Event> eventLoop;
+		/// <summary> Event loop backbuffer </summary>
+		public Queue<Event> eventBackbuffer;
 
+		/// <summary> List of Coroutines </summary>
+		public List<IEnumerator> coroutines;
+
+		/// <summary> Wrapped context for later execution </summary>
+		public class Event {
+			/// <summary> Function to run, if present </summary>
+			public JsonFunction fn;
+			/// <summary> Args to run function with </summary>
+			public JsonArray args;
+			/// <summary> Node to run, if present </summary>
+			public Node node;
+			/// <summary> Frame stack to run event with </summary>
+			public Stack<Frame> context;
+			/// <summary> Resolved value if this event was caused by a promise </summary>
+			public JsonValue resolved; 
+		}
+		
+		/// <summary> Sets up a Frame to a default state. </summary>
+		public Interpreter() {
+			global = new JsonObject();
+
+			// Set up a debug object... (Debug.Log, wew)
+			var proxy = global["Debug"] = new JsonObject();
+			proxy["Log"] = new JsonFunction((context, prams) => { Debug.Log("XJS Debug Log: \n" + prams[0].ToString()); return JsonNull.instance; });
+
+			defaultFrames = frames = new Stack<Frame>();
+			frames.Push(new Frame(global));
+			eventLoop = new Queue<Event>();
+			eventBackbuffer = new Queue<Event>();
+			coroutines = new List<IEnumerator>();
+		}
+
+		#region FRAME_ACCESS
 		/// <summary> Gets a value along a path in the current stack.  </summary>
 		/// <param name="path"> Path-formed string </param>
 		/// <returns> Object in the current frame at the given path. </returns>
@@ -286,7 +344,7 @@ public partial class XJS {
 			return null;
 		}
 
-		/// <summary> </summary>
+		/// <summary> Checks the current context and sets a field for the current context. </summary>
 		/// <param name="obj"></param>
 		/// <param name="key"> Key to set, may be index or key  </param>
 		/// <param name="value"> Value to set </param>
@@ -342,20 +400,9 @@ public partial class XJS {
 			}
 
 		}
-
-
-		/// <summary> Sets up a Frame to a default state. </summary>
-		public Interpreter() {
-			global = new JsonObject();
-
-			// Set up a debug object... (Debug.Log, wew)
-			var proxy = global["Debug"] = new JsonObject();
-			proxy["Log"] = new JsonFunction((context, prams)=>{Debug.Log("XJS Debug Log: \n" + prams[0].ToString()); return JsonNull.instance; });
-
-			frames = new Stack<Frame>();
-			frames.Push(new Frame(global));
-		}
-
+		#endregion
+		
+		#region FUNCTION_GENERATION
 		/// <summary> Turns a method info and an object to bind it to into a JsonFunction that can be called from inside of a script. </summary>
 		/// <param name="info"> MethodInfo to bind.</param>
 		/// <param name="obj"> Object to bind the function call to. pass null for static objects. </param>
@@ -366,7 +413,6 @@ public partial class XJS {
 				//Dbg($"Invoking Wrapper Function for {info.DeclaringType}.{info.Name}");
 				
 				try {
-
 					var pramInfos = info.GetParameters();
 					object[] reflParams = new object[pramInfos.Length];
 
@@ -397,6 +443,9 @@ public partial class XJS {
 					object result = info.Invoke(obj, reflParams);
 					
 					if (ReferenceEquals(result, null)) { return JsonNull.instance; }
+					if (result is IEnumerator) {
+						return new JsonPromise(result as IEnumerator);
+					}
 
 					// regular cast, generates error if it fails.
 					return (JsonValue) result;
@@ -448,6 +497,7 @@ public partial class XJS {
 
 				next.Declare(ARGNAMES, argNames);
 				next.Declare(ARGS, args);
+				// Push context in frame
 				next.Push();
 
 				// Push stackframe onto stack
@@ -458,6 +508,7 @@ public partial class XJS {
 				JsonValue result = Execute(body);
 				//Dbg($"After\n{frame}");
 				// Pop stackframe from stack 
+
 				frames.Pop();
 
 				// Return result 
@@ -465,7 +516,9 @@ public partial class XJS {
 			});
 
 		}
+		#endregion
 
+		#region REFLECTION
 		private static readonly object[] EMPTY_ARGS = new object[0];
 
 		const BindingFlags ANY_INSTANCE = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -478,11 +531,11 @@ public partial class XJS {
 		/// <summary> Loads methods from a given type to be called via reflection inside of scripts. Adds an object to the global namespace. </summary>
 		/// <param name="type"> Type to reflect into a set of JsonFunctions </param>
 		/// <param name="lim"> A set of strings to use to limit the methods that are reflected. </param>
-		public void LoadMethods(Type type, string[] lim = null) {
+		public void LoadMethods(Type type, params string[] lim) {
 
 			List<MethodInfo> methods = new List<MethodInfo>();
 
-			if (lim == null) {
+			if (lim == null || lim.Length == 0) {
 				MethodInfo[] ms = type.GetMethods(ANY_PUBLIC);
 				methods.AddRange(ms);
 			} else {
@@ -502,24 +555,35 @@ public partial class XJS {
 			
 			global[type.Name] = typeRep;
 		}
+		#endregion
 
-		public static BinaryOp ADD_OP = (lhs, rhs) => { return lhs + rhs; };
-		public static BinaryOp SUB_OP = (lhs, rhs) => { return lhs - rhs; };
+		/// <summary> Runs all pending events </summary>
+		public void FlushEvents() {
+			// Swap buffers so new events don't hang the interpreter.
+			var events = eventLoop;
+			eventLoop = eventBackbuffer;
+			eventBackbuffer = events;
 
-		public static BinaryOp MUL_OP = (lhs, rhs) => { return lhs * rhs; };
-		public static BinaryOp DIV_OP = (lhs, rhs) => { return lhs / rhs; };
-		public static BinaryOp MOD_OP = (lhs, rhs) => { return lhs / rhs; };
+			// Yeet all of the events
+			while (events.Count > 0) {
+				var evt = events.Dequeue();
+				// Swap to stack frame for event
+				frames = evt.context;
 
-		public static BinaryOp AND_OP = (lhs, rhs) => { return lhs && rhs; };
-		public static BinaryOp OR_OP = (lhs, rhs) => { return lhs || rhs; };
+				var result = Execute(evt.fn, evt.args);
+				
 
-		public static BinaryOp EQ_OP = (lhs, rhs) => { return (lhs == rhs); };
-		public static BinaryOp NE_OP = (lhs, rhs) => { return (lhs != rhs); };
-		public static BinaryOp GT_OP = (lhs, rhs) => { return (lhs > rhs); };
-		public static BinaryOp GE_OP = (lhs, rhs) => { return (lhs >= rhs); };
-		public static BinaryOp LT_OP = (lhs, rhs) => { return (lhs < rhs); };
-		public static BinaryOp LE_OP = (lhs, rhs) => { return (lhs <= rhs); };
+			}
+			
+			// Restore default stackframe for one-shot execution.
+			frames = defaultFrames;
 
+		}
+
+		
+
+
+		
 		/// <summary> Returns an <see cref="IEnumerable{T}"/> of <see cref="JsonValue"/> which allows top-level statements in a program to be executed one at a time </summary>
 		/// <param name="node"> Node to execute. </param>
 		/// <returns> <see cref="IEnumerator{T}"/> of <see cref="JsonValue"/> for every result of each statement. </returns>
@@ -527,17 +591,27 @@ public partial class XJS {
 		/// <paramref name="node"/> must be of <see cref="Node.type"/> == <see cref="XJS.Nodes.PROGRAM"/>. 
 		/// </remarks>
 		public IEnumerator<JsonValue> Stepper(Node node, JsonObject context = null) {
-			if (exception != null) { yield break; }
+			Stack<Frame> stack = new Stack<Frame>();
+			stack.Push(new Frame(global));
+			if (context != null) {
+				stack.Push(new Frame(context));
+			}
+
+			return Stepper(node, stack);
+		}
+		
+		public IEnumerator<JsonValue> Stepper(Node node, Stack<Frame> context) {
+
 			if (node == null) {
 				Debug.LogWarning("Atchung! Stepping on null node!");
 				yield break;
 			}
-
+			
 			switch (node.type) {
+				case CODEBLOCK:
+				case STMTLIST:
 				case PROGRAM: {
-						if (context == null) { context = new JsonObject(); }
-						Frame frame = new Frame(context);
-
+						
 						Node stmts = node.Child("stmts");
 
 						JsonValue last = null;
@@ -547,13 +621,15 @@ public partial class XJS {
 							last = Execute(stmts.Child(i));
 							frames.Pop();
 
-							yield return last;
+							if (last is JsonPromise) {
+								yield return last;
+							}
 							// Respect any ongoing flow-control, which will escape the scope blocks
 							if (breakTarget != null || continueTarget != null) { break; }
 							if (returnValue != null) { yield return returnValue; yield break; }
 							// Any returning implies there will be a frame removed anyway, so this doesn't need to pop the frame from the stack...
 						}
-						
+
 
 						yield break;
 					}
@@ -562,10 +638,9 @@ public partial class XJS {
 						yield break;
 					}
 			}
-
 		}
 
-		/// <summary> Executes a JsonFunction in the context of this interpreter. </summary>
+		/// <summary> Executes a JsonFunction in the current context of this interpreter. </summary>
 		/// <param name="fn"> Function to execute. </param>
 		/// <param name="args"> Arguments to pass to function </param>
 		/// <returns> Result of function's execution. </returns>
@@ -574,7 +649,7 @@ public partial class XJS {
 			return fn.Invoke(global, args);
 		}
 		
-		/// <summary> Fully executes a program tree. </summary>
+		/// <summary> Fully executes a program tree in the current context </summary>
 		/// <param name="node"> Root node of program tree to execute. </param>
 		/// <returns> Result of execution </returns>
 		public JsonValue Execute(Node node) {
@@ -614,22 +689,51 @@ public partial class XJS {
 							frame.Pop();
 							return last;
 						}
+					case AWAIT: {
+							Node expr = node.Child("expr");
+							Node rest = node.Child("rest");
 
-						
+							JsonValue exprResult = Execute(expr);
+							if (exprResult is JsonPromise) {
+								JsonPromise promise = exprResult as JsonPromise;
+								if (rest != null) {
+									Event evt = new Event() {
+										node = rest,
+										context = frames,
+										
+									};
+									// When an await node is run directly, continue rest of body automatically upon completeion
+									promise.resolve += (rval) => {
+										evt.resolved = rval;
+										eventLoop.Enqueue(evt);
+									};
+								}
+							} else {
+								if (rest != null) {
+									Execute(rest);
+								}
+							}
+							
+							// Send promise upwards
+							return exprResult;
+						}
 					case DECSTMT: { // Declaration statement
 
 							string target = node.Data("target");
 							Node expr = node.Child("expr");
 							JsonValue result = Execute(expr);
-							frame.Declare(target, result);
+							if (result is JsonPromise) {
+								
+							} else {
+								frame.Declare(target, result);
+							}
 							return result;
 						}
 
-					case ARRAYLITERAL: { // Array Literal, obviously. 
+					case ARRAYLITERAL: { // Array Literal, including splat
 							JsonArray arr = new JsonArray();
 
 							if (node.NodesListed > 0) {
-								// TBD: stitched/splatted arrays
 								foreach (var child in node.nodeList) {
 									if (child.type == SPREAD) {
 										var it = Execute(child.Child("target"));
@@ -646,7 +750,7 @@ public partial class XJS {
 							
 							return arr;
 						}
-					case OBJECTLITERAL: { // Object Literal, obviously. 
+					case OBJECTLITERAL: { // Object Literal, including splat and captures
 							JsonObject obj = new JsonObject();
 							
 							if (node.DataListed > 0) {
