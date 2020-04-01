@@ -59,6 +59,7 @@ using System.Reflection;
 using System.Linq;
 using System.Text; // Needed when paired alongside ZSharp, since StringBuilder is wrapped (outside of namespace)
 using System.Runtime.CompilerServices;
+using System.Collections.Concurrent;
 
 #region Abstract/Primary stuff
 
@@ -96,9 +97,9 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 3;
+	public const int MINOR = 4;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 1;
+	public const int REV = 0;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -268,14 +269,14 @@ public abstract class JsonValue {
 	}
 
 	/// <summary> Does this JsonValue have a given key, when treated as a JsonObject </summary>
-	public virtual bool ContainsKey(string key) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
+	public virtual bool ContainsKey(JsonString key) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 	/// <summary> Does this JsonValue contain all of the keys in a given array, when treated as a JsonObject </summary>
-	public virtual bool ContainsAllKeys(params string[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
+	public virtual bool ContainsAllKeys(params JsonString[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 	/// <summary> Does this JsonValue contain any of the keys in a given array, when treated as a JsonObject </summary>
-	public virtual bool ContainsAnyKeys(params string[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
+	public virtual bool ContainsAnyKeys(params JsonString[] keys) { throw new InvalidOperationException("This JsonValue cannot be indexed with a string"); }
 
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a string at a given key </summary>
-	public string GetString(string key) {
+	public string GetString(JsonString key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
 			if (thing.isString) { return thing.stringVal; }
@@ -284,7 +285,7 @@ public abstract class JsonValue {
 	}
 
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a bool at a given key </summary>
-	public bool GetBoolean(string key) {
+	public bool GetBoolean(JsonString key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
 			if (thing.isBool) { return thing.boolVal; }
@@ -293,11 +294,11 @@ public abstract class JsonValue {
 	}
 
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a float at a given key. </summary>
-	public float GetFloat(string key) { return (float)GetNumber(key); }
+	public float GetFloat(JsonString key) { return (float)GetNumber(key); }
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve an int at a given key. </summary>
-	public int GetInt(string key) { return (int)GetNumber(key); }
+	public int GetInt(JsonString key) { return (int)GetNumber(key); }
 	/// <summary> Treat this JsonValue as a JsonObject, and retrieve a double at a given key. </summary>
-	public double GetNumber(string key) {
+	public double GetNumber(JsonString key) {
 		if (ContainsKey(key)) {
 			JsonValue thing = this[key];
 			if (thing.isNumber) { return thing.numVal; }
@@ -531,7 +532,7 @@ public abstract class JsonValue {
 					
 					int i = 0;
 					foreach (var pair in obj) {
-						string key = pair.Key.stringVal;
+						JsonString key = pair.Key;
 						JsonValue val = pair.Value;
 						if (!ContainsKey(key)) { return false; }
 						if (!val.Equals(this[key])) { return false; }
@@ -939,9 +940,12 @@ public class JsonNumber : JsonValue {
 
 /// <summary> Representation of a string as a JsonValue </summary>
 public class JsonString : JsonValue {
+	/// <summary> Constant for String interning </summary>
+	private const int MAX_INTERN_SIZE = 32;
 	/// <summary> Internal representation </summary>
 	private string _value;
 
+	
 	/// <inheritdoc />
 	public override double numVal {
 		get {
@@ -968,13 +972,27 @@ public class JsonString : JsonValue {
 	/// <inheritdoc />
 	public override JsonType JsonType { get { return JsonType.String; } }
 
+#if !NO_INTERNS
+	/// <summary> Constructor </summary>
+	public JsonString(string value) : base() { _value = value.Length <= MAX_INTERN_SIZE ? string.Intern(value) : value; }
+	/// <summary> Interns JsonString instances to reduce RAM usage and garbage collection. </summary>
+	private static readonly ConcurrentDictionary<string, JsonString> INTERNS = new ConcurrentDictionary<string, JsonString>();
+	/// <summary> Implicit conversion from string to JsonString </summary>
+	public static implicit operator JsonString(string val) { 
+		if (val.Length > MAX_INTERN_SIZE) { return new JsonString(val); }
+		if (!INTERNS.ContainsKey(val)) { INTERNS[val] = new JsonString(val); }
+		return INTERNS[val]; 
+	}
+#else
+	/// <summary> Constructor </summary>
+	public JsonString(string value) : base() { _value = value; }
 	/// <summary> Implicit conversion from string to JsonString </summary>
 	public static implicit operator JsonString(string val) { return new JsonString(val); }
+#endif
+
 	/// <summary> Implicit conversion from JsonString to string </summary>
 	public static implicit operator string(JsonString val) { return val._value; }
 
-	/// <summary> Constructor </summary>
-	public JsonString(string value) : base() { _value = value; }
 
 	/// <summary> Get the hash code of this object. Wraps through to the string inside of it. </summary>
 	public override int GetHashCode() { return _value.GetHashCode(); }
@@ -1049,16 +1067,10 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 					} else {
 						obj[key] = str.Replace("\\n", "\n").Replace("\\t", "\t");
 					}
-
-
 				}
-
 			}
-
 			ret.Add(objkey, obj);
-
 		}
-
 		return ret;
 	}
 	
@@ -1121,16 +1133,16 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 		}
 	}
 	/// <inheritdoc />
-	public override bool ContainsKey(string key) { return data.ContainsKey(key); }
+	public override bool ContainsKey(JsonString key) { return data.ContainsKey(key); }
 	/// <inheritdoc />
-	public override bool ContainsAnyKeys(params string[] keys) {
+	public override bool ContainsAnyKeys(params JsonString[] keys) {
 		foreach (string key in keys) {
 			if (ContainsKey(key)) { return true; }
 		}
 		return false;
 	}
 	/// <inheritdoc />
-	public override bool ContainsAllKeys(params string[] keys) {
+	public override bool ContainsAllKeys(params JsonString[] keys) {
 		foreach (string key in keys) {
 			if (!ContainsKey(key)) { return false; }
 		}
@@ -1140,31 +1152,32 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <summary> Does this object have a property defined as <paramref name="key"/>?</summary>
 	/// <param name="key"> Name of property to check. </param>
 	/// <returns> True if property exists, false otherwise. </returns>
-	public bool Has(string key) { return data.ContainsKey(key); }
-
+	public bool Has(JsonString key) { return data.ContainsKey(key); }
+	
 	/// <summary> Does this object have a property defined as <paramref name="key"/> that matches <typeparamref name="T"/>? </summary>
 	/// <typeparam name="T"> JsonValue based type to match </typeparam>
 	/// <param name="key"> Key to check </param>
 	/// <returns> true if <paramref name="key"/> exists, and matches the given type, otherwise false </returns>
-	public bool Has<T>(string key) where T : JsonValue {
+	public bool Has<T>(JsonString key) where T : JsonValue {
 		return Has(key) && this[key].GetType() == typeof(T);
 	}
+
 	/// <summary> Does this object contain all of the given keys? </summary>
 	/// <param name="keys"> Array of keys to check </param>
 	/// <returns> True if this object has all of the keys, false otherwise </returns>
-	public bool HasAll(params string[] keys) { return this.ContainsAllKeys(keys); }
+	public bool HasAll(params JsonString[] keys) { return this.ContainsAllKeys(keys); }
 	/// <summary> Does this object contain all of the given keys? </summary>
 	/// <param name="keys"> Collection of keys to check </param>
 	/// <returns> True if this object has all of the keys, false otherwise </returns>
-	public bool HasAll(IEnumerable<string> keys) { return this.ContainsAllKeys(keys.ToArray()); }
+	public bool HasAll(IEnumerable<JsonString> keys) { return this.ContainsAllKeys(keys.ToArray()); }
 	/// <summary> Does this object contain any of the given keys? </summary>
 	/// <param name="keys"> Array of keys to check </param>
 	/// <returns> True if this object has any single key, false if the object contains NONE of the keys. </returns>
-	public bool HasAny(params string[] keys) { return this.ContainsAnyKeys(keys); }
+	public bool HasAny(params JsonString[] keys) { return this.ContainsAnyKeys(keys); }
 	/// <summary> Does this object contain any of the given keys? </summary>
 	/// <param name="keys"> Array of keys to check </param>
 	/// <returns> True if this object has any single key, false if the object contains NONE of the keys. </returns>
-	public bool HasAny(IEnumerable<string> keys) { return this.ContainsAnyKeys(keys.ToArray()); }
+	public bool HasAny(IEnumerable<JsonString> keys) { return this.ContainsAnyKeys(keys.ToArray()); }
 	
 	/// <summary> Default Constructor, creates an empty JsonObject with the standard Dictionary. </summary>
 	public JsonObject() : base() { data = DictionaryGenerator(); }
@@ -1228,12 +1241,12 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	}
 
 	/// <summary> Attempt to get a T from a given key. Reflects the JsonValue into a T </summary>
-	public T Get<T>(string key) { return Json.GetValue<T>(this[key]); }
+	public T Get<T>(JsonString key) { return Json.GetValue<T>(this[key]); }
 
 	/// <summary> Attempt to get a primitive type from a given key. </summary>
-	public object GetPrimitive<T>(string name) { return GetPrimitive(name, typeof(T)); }
+	public object GetPrimitive<T>(JsonString name) { return GetPrimitive(name, typeof(T)); }
 	/// <summary> Attempt to get a primitive type from a given key and given type.</summary>
-	public object GetPrimitive(string name, Type type) {
+	public object GetPrimitive(JsonString name, Type type) {
 		JsonValue val = this[name];
 		if (type == typeof(string) && val.isString) { return val.stringVal; }
 		if (type == typeof(float) && val.isNumber) { return val.floatVal; }
@@ -1275,14 +1288,14 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// Returns the T if it can be found.
 	/// If a T cannot be found, returns a default value. </summary>
 	[System.Obsolete("Renamed to 'Pull'")]
-	public T Extract<T>(string key, T defaultValue = default(T)) {
+	public T Extract<T>(JsonString key, T defaultValue = default(T)) {
 		return Pull<T>(key, defaultValue);
 	}
 
 	/// <summary>Try to get a T from this object. 
 	/// Returns the T if it can be found.
 	/// If a T cannot be found, returns a default value. </summary>
-	public T Pull<T>(string key, T defaultValue = default(T)) {
+	public T Pull<T>(JsonString key, T defaultValue = default(T)) {
 		if (ContainsKey(key)) {
 			JsonValue val = this[key];
 
@@ -1320,7 +1333,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public Dictionary<string, bool> ToDictOfBool() {
 		Dictionary<string, bool> d = new Dictionary<string, bool>();
 		foreach (var pair in data) {
-			if (pair.Value.isBool) { d[pair.Key] = pair.Value.boolVal; }
+			if (pair.Value.isBool) { d[pair.Key.stringVal] = pair.Value.boolVal; }
 		}
 		return d;
 	}
@@ -1328,7 +1341,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public Dictionary<string, string> ToDictOfString() {
 		Dictionary<string, string> d = new Dictionary<string, string>();
 		foreach (var pair in data) {
-			if (pair.Value.isString) { d[pair.Key] = pair.Value.stringVal; }
+			if (pair.Value.isString) { d[pair.Key.stringVal] = pair.Value.stringVal; }
 		}
 		return d;
 	}
@@ -1336,7 +1349,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public Dictionary<string, double> ToDictOfDouble() {
 		Dictionary<string, double> d = new Dictionary<string, double>();
 		foreach (var pair in data) {
-			if (pair.Value.isNumber) { d[pair.Key] = pair.Value.numVal; }
+			if (pair.Value.isNumber) { d[pair.Key.stringVal] = pair.Value.numVal; }
 		}
 		return d;
 	}
@@ -1344,7 +1357,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public Dictionary<string, float> ToDictOfFloat() {
 		Dictionary<string, float> d = new Dictionary<string, float>();
 		foreach (var pair in data) {
-			if (pair.Value.isNumber) { d[pair.Key] = (float)pair.Value.numVal; }
+			if (pair.Value.isNumber) { d[pair.Key.stringVal] = (float)pair.Value.numVal; }
 		}
 		return d;
 	}
@@ -1352,14 +1365,14 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	public Dictionary<string, int> ToDictOfInt() {
 		Dictionary<string, int> d = new Dictionary<string, int>();
 		foreach (var pair in data) {
-			if (pair.Value.isNumber) { d[pair.Key] = (int)pair.Value.numVal; }
+			if (pair.Value.isNumber) { d[pair.Key.stringVal] = (int)pair.Value.numVal; }
 		}
 		return d;
 	}
 	#endregion
 	
 	/// <summary> Removes the KeyValue pair associated with the given key </summary>
-	public JsonObject Remove(string key) {
+	public JsonObject Remove(JsonString key) {
 		if (ContainsKey(key)) { data.Remove(key); }
 		return this;
 	}
@@ -1386,10 +1399,10 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <param name="mask">JsonObject containing mask pairs. Only considers pairs of (string, bool) </param>
 	/// <returns>A copy of the original JsonObject with the mask applied to it. </returns>
 	public JsonObject Mask(JsonObject mask) {
-		List<string> msk = new List<string>();
+		List<JsonString> msk = new List<JsonString>();
 		foreach (var pair in mask) {
 			if (pair.Value.isBool && pair.Value.boolVal) {
-				msk.Add(pair.Key.stringVal);
+				msk.Add(pair.Key);
 			}
 		}
 		return Mask(msk);
@@ -1595,14 +1608,10 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 					} else {
 						obj[key] = str.Replace("\\n", "\n").Replace("\\t", "\t");
 					}
-
 				}
-
 			}
 			arr.Add(obj);
-
 		}
-
 		return arr;
 	}
 
@@ -2556,7 +2565,6 @@ public class JsonDeserializer {
 	private string json;
 	/// <summary> Internal index. Do not modify outside of <see cref="index"/>.set </summary>
 	private int __index;
-	
 	/// <summary> Current position. </summary>
 	private int index {
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -2982,7 +2990,7 @@ public static class JsonOperations {
 		} else {
 			foreach (var val in lim) {
 				if (val.isString) {
-					result[val.stringVal] = -obj.GetNumber(val.stringVal);
+					result[val] = -obj.GetNumber(val.stringVal);
 				}
 			}
 		}
@@ -3003,7 +3011,7 @@ public static class JsonOperations {
 		} else {
 			foreach (var key in lim) {
 				if (key.isString) {
-					var val = thing[key.stringVal];
+					var val = thing[key];
 					if (val.isNumber) { sum += val.numVal; }
 				}
 			}
@@ -3023,7 +3031,7 @@ public static class JsonOperations {
 
 		if (lim == null) {
 			foreach (var lpair in lhs) {
-				string key = lpair.Key.stringVal;
+				var key = lpair.Key;
 				var lval = lpair.Value;
 
 				if (lval != null && lval.isNumber) {
@@ -3036,7 +3044,7 @@ public static class JsonOperations {
 		} else {
 			foreach (var val in lim) {
 				if (val.isString) {
-					string key = val.stringVal;
+					var key = val as JsonString;
 					result[key] = lhs.GetFloat(key) * rhs.GetFloat(key);
 				}
 			}
@@ -3057,7 +3065,7 @@ public static class JsonOperations {
 		if (lim == null) {
 			foreach (var pair in rhs) {
 				JsonValue val = pair.Value;
-				string key = pair.Key.stringVal;
+				JsonString key = pair.Key;
 				if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
 				if (val.isNumber) { result[key] = lhs.GetNumber(key) * val.numVal; }
 			}
@@ -3065,8 +3073,8 @@ public static class JsonOperations {
 		} else {
 			foreach (var field in lim) {
 				if (field.isString) {
-					JsonValue val = rhs[field.stringVal];
-					string key = field.stringVal;
+					JsonString key = field as JsonString;
+					JsonValue val = rhs[key];
 
 					if (val.isObject) { result[key] = lhs.MultiplyRow(val as JsonObject); }
 					if (val.isNumber) { result[key] = lhs.GetNumber(key) * val.numVal; }
@@ -3085,7 +3093,7 @@ public static class JsonOperations {
 		double d = 0;
 
 		foreach (var pair in rhs) {
-			if (pair.Value.isNumber) { d += lhs.GetNumber(pair.Key.stringVal) * pair.Value.numVal; }
+			if (pair.Value.isNumber) { d += lhs.GetNumber(pair.Key) * pair.Value.numVal; }
 		}
 
 		return d;
@@ -3101,17 +3109,17 @@ public static class JsonOperations {
 
 		if (lim == null) {
 			foreach (var pair in lhs) {
-				if (pair.Value.isNumber) { result[pair.Key.stringVal] = pair.Value; }
+				if (pair.Value.isNumber) { result[pair.Key] = pair.Value; }
 			}
 
 			foreach (var pair in rhs) {
-				if (pair.Value.isNumber) { result[pair.Key.stringVal] = result.GetNumber(pair.Key.stringVal) + pair.Value.numVal; }
+				if (pair.Value.isNumber) { result[pair.Key] = result.GetNumber(pair.Key) + pair.Value.numVal; }
 			}
 
 		} else {
 			foreach (var val in lim) {
 				if (val.isString) {
-					string key = val.stringVal;
+					JsonString key = val as JsonString;
 					result[key] = lhs.GetNumber(key) + rhs.GetNumber(key);
 				}
 			}
@@ -3135,21 +3143,21 @@ public static class JsonOperations {
 
 		if (lim == null) {
 			foreach (var pair in lhs) {
-				if (pair.Value.isNumber) { result[pair.Key.stringVal] = Clamp(pair.Value.numVal); }
+				if (pair.Value.isNumber) { result[pair.Key] = Clamp(pair.Value.numVal); }
 			}
 
 			foreach (var pair in rhs) {
 				if (pair.Value.isNumber) {
-					double a = result.GetNumber(pair.Key.stringVal);
+					double a = result.GetNumber(pair.Key);
 					double b = Clamp(pair.Value.numVal);
 
-					result[pair.Key.stringVal] = 1 - (1 - a) * (1 - b);
+					result[pair.Key] = 1 - (1 - a) * (1 - b);
 				}
 			}
 		} else {
 			foreach (var val in lim) {
 				if (val.isString) {
-					string key = val.stringVal;
+					JsonString key = val as JsonString;
 					double a = Clamp(lhs.GetNumber(key));
 					double b = Clamp(rhs.GetNumber(key));
 					result[key] = 1 - (1 - a) * (1 - b);
@@ -3171,13 +3179,13 @@ public static class JsonOperations {
 		string contains = rule.Pull<string>("contains", "");
 
 		foreach (var pair in obj) {
-			string key = pair.Key.stringVal;
+			string key = pair.Key;
 
 			if (("" == prefix || key.StartsWith(prefix))
 				&& ("" == suffix || key.EndsWith(suffix))
 				&& ("" == contains || key.Contains(contains))) {
 
-				result.Add(key);
+				result.Add(pair.Key);
 			}
 
 		}
@@ -3193,7 +3201,6 @@ public static class JsonOperations {
 	/// <param name="reductor"> Function to use to pick a value from the arrays </param>
 	/// <returns></returns>
 	public static JsonObject ReduceArrays(this JsonObject source, string[] fields, Func<JsonArray, JsonValue> reductor) {
-
 		foreach (var field in fields) {
 			var val = source[field];
 			if (val.isArray) { source[field] = reductor(val as JsonArray); }
@@ -3201,10 +3208,10 @@ public static class JsonOperations {
 		return source;
 	}
 
-	public static JsonValue Xpath(this JsonValue src, string path) {
+	public static JsonValue XPath(this JsonValue src, string path) {
 		if (src != null) {
 			JsonValue trace = src;
-			String[] jumps = path.Split('.', '/');
+			string[] jumps = path.Split('.', '/');
 			//try {
 			foreach (string jump in jumps) {
 				if (trace.isObject || trace.isArray) {
@@ -3220,7 +3227,7 @@ public static class JsonOperations {
 	public static T XPath<T>(this JsonValue src, string path) where T : JsonValue {
 		if (src != null) {
 			JsonValue trace = src;
-			String[] jumps = path.Split('.', '/');
+			string[] jumps = path.Split('.', '/');
 			//try {
 			foreach (string jump in jumps) {
 				if (trace.isObject || trace.isArray) {
