@@ -1,9 +1,9 @@
 /*	XtoJSON
 	Lightweight JSON Library for C#
-	2015-2017  Jonathan Cohen
+	2015-2020  Jonathan Cohen
 	Contact: ninjapretzel@yahoo.com
 
-    Copyright (c) 2019 Jonathan Cohen aka ninjapretzel
+	Copyright (c) 2020 Jonathan Cohen aka ninjapretzel
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal
@@ -97,7 +97,7 @@ public static class Json {
 	/// <summary> Major version number </summary>
 	public const int MAJOR = 2;
 	/// <summary> Minor version number </summary>
-	public const int MINOR = 4;
+	public const int MINOR = 5;
 	/// <summary> Sub-minor version Revision number </summary>
 	public const int REV = 0;
 
@@ -105,12 +105,14 @@ public static class Json {
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
 
 	/// <summary> Parse a json string into its JsonValue representation. </summary>
+	/// <param name="json"> JSON formatted string to parse </param>
+	/// <returns> <see cref="JsonValue"/> result, otherwise null. </returns>
 	public static JsonValue Parse(string json) {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		return jds.Deserialize();
 	}
 
-	/// <summary> Parses a JSON formatted string directly into a JsonValue derivitive type. </summary>
+	/// <summary> Parses a JSON formatted string directly into a <see cref="JsonValue"/> derivitive type. </summary>
 	/// <typeparam name="T"> Expected result type. </typeparam>
 	/// <param name="json"> JSON formatted string to parse </param>
 	/// <returns> Object of type T, or null. </returns>
@@ -118,6 +120,24 @@ public static class Json {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		JsonValue val = jds.Deserialize();
 		return (val is T) ? ((T)val) : null;
+	}
+
+	/// <summary> Parses a JSON formatted string using strict rules directly into a <see cref="JsonValue"/> derivitive type.  </summary>
+	/// <param name="json"> JSON formatted string to parse </param>
+	/// <returns> <see cref="JsonValue"/> result, otherwise throws a <see cref="JsonDeserializeFailedException"/>. </returns>
+	public static JsonValue ParseStrict(string json) {
+		JsonDeserializer jds = new JsonDeserializer(json);
+		return jds.DeserializeStrict();
+	}
+	/// <summary> Parses a JSON formatted string directly into a <see cref="JsonValue"/> derivitive type. </summary>
+	/// <typeparam name="T"> Expected result type. </typeparam>
+	/// <param name="json"> JSON formatted string to parse </param>
+	/// <returns> Object of type T, or null. </returns>
+	public static T ParseStrict<T>(string json) where T : JsonValue {
+		JsonDeserializer jds = new JsonDeserializer(json);
+		JsonValue val = jds.DeserializeStrict();
+
+		return (val is T) ? ((T)val) : throw new Exception($"Type {typeof(T)} expected, parsed {val.GetType()}");
 	}
 
 	/// <summary> Parses a string, directly into an arbitrary type. Hurr, get it? Json.To&lt;X&gt;</summary>
@@ -2619,13 +2639,7 @@ public class JsonDeserializer {
 	JsonValue ProcessValue() {
 		if (cur == '[') { return ProcessArray(); }
 		if (cur == '{') { return ProcessObject(); }
-		if (cur == '"') {
-			string val = ProcessString();
-			val = val.JsonUnescapeString();
-			//TBD: Additional processing if needed
-
-			return val;
-		}
+		if (cur == '"') { return ProcessString().JsonUnescapeString(); }
 		int startIndex = index;
 		while (index < json.Length && cur != ',' && cur != '}' && cur != ']' && !char.IsWhiteSpace(cur)) {
 			index++;
@@ -2653,23 +2667,17 @@ public class JsonDeserializer {
 
 		while (true) {
 			index++;
-
 			while (cur != '\"') { index++; }
-
+			// Found potential matching \"
 			int j = index - 1;
 			int count = 0;
 
-			while (json[j] == '\\') {
-				j--;
-				count++;
-			}
+			while (json[j] == '\\') { j--; count++; }
 
 			//if there are an even number of backslashes, 
 			//then they are all just backslashes and they aren't escaping the quote
-			//otherwise, the quote is being escaped and we need to keep searching for the close quote
-			if (count % 2 == 0) {
-				break;
-			}
+			if (count % 2 == 0) { break; }
+			//otherwise. if odd, the quote is being escaped and we need to keep searching for the close quote
 		}
 		
 		// Consume final '"'
@@ -2802,7 +2810,7 @@ public class JsonDeserializer {
 			}
 		}
 	}
-	/// <summary> Logic to skip to the next non-whitepace character </summary>
+	/// <summary> Logic to skip to the next non-whitepace character, and there should be one. </summary>
 	void SkipWhitespace() {
 		bool comment = AtComment();
 		while (comment || char.IsWhiteSpace(cur)) {
@@ -2815,6 +2823,73 @@ public class JsonDeserializer {
 			}
 		}
 	}
+
+	/// <summary> Deserialize in strict mode, rejecting all syntactic sugar. </summary>
+	/// <returns> Deserialized JsonValue </returns>
+	public JsonValue DeserializeStrict() {
+		index = 0;
+		if (json.Length == 0) { return false; }
+		void Skip() { while (char.IsWhiteSpace(cur)) { index++; } }  
+		void SkipEnd() { while (index < json.Length && char.IsWhiteSpace(cur)) { index++; } }  
+		SkipEnd();
+		JsonValue LintValue() {
+			if (cur == '{') { return LintObject(); }
+			if (cur == '[') { return LintArray(); }
+			if (cur == '"') { return ProcessString().JsonUnescapeString(); }
+
+			int startIndex = index;
+			while (index < json.Length && !char.IsWhiteSpace(cur)) { index++; }
+			string jval = json.Substring(startIndex, index - startIndex);
+			if (jval == "true") { return JsonBool.TRUE; }
+			if (jval == "false") { return JsonBool.FALSE; }
+			if (jval == "null") { return JsonValue.NULL; }
+			double dval;
+			if (double.TryParse(jval, out dval)) { return dval; }
+
+			throw new JsonDeserializeFailedException($"\"{jval}\" does not match any JsonValue.", this);
+		}
+
+		JsonArray LintArray() {
+			index++;
+			JsonArray arr = new JsonArray();
+			Skip();
+			if (cur == ']') { index++; return arr; }
+			while (true) {
+				JsonValue val = LintValue();
+				Skip();
+				if (cur == ']') { index++; break; }
+				if (cur != ',') { throw new JsonDeserializeFailedException("Strict Json requires ',' separating array values", this); }
+			}
+			return arr;
+		}
+		JsonObject LintObject() {
+			index++;
+			JsonObject obj = new JsonObject();
+			Skip();
+			if (cur == '}') { index++; return obj; }
+			while (true) {
+				if (cur != '"') { throw new JsonDeserializeFailedException("Strict Json requires keys be in quotes.", this); }
+				string key = ProcessString();
+				key = key.JsonUnescapeString();
+				Skip();
+				if (cur != ':') { throw new JsonDeserializeFailedException("Strict Json requires ':' after object key", this); }
+				index++;
+				JsonValue value = LintValue();
+				obj.Add(key, value);
+				Skip();
+				if (cur == '}') { index++; break; }
+				if (cur != ',') { throw new JsonDeserializeFailedException("Strict Json requires ',' separating object pairs", this); }
+			}
+			return obj;
+		}
+
+		JsonValue parsed = LintValue(); 
+		SkipEnd();
+		if (index != json.Length) { throw new JsonDeserializeFailedException("Strict Json requires no additional non-whitespace characters at the end", this); }
+		return parsed;
+	}
+
+
 
 
 }
@@ -2844,7 +2919,7 @@ public static class JsonHelpers {
 	/// <summary> Is an object of an array type? </summary>
 	public static bool IsTypeOfArray(this object o) { return o.GetType().IsArray; }
 
-	/// <summary> Replace all escapeable characters with their escaped versions. </summary>
+	/// <summary> Replace escapeable characters with their escaped versions, except '/' and '\u'. </summary>
 	public static string JsonEscapeString(this string str) {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
@@ -2855,7 +2930,14 @@ public static class JsonHelpers {
 		return s;
 	}
 
-	/// <summary> Replace all escaped characters with their unescaped versions. </summary>
+	/// <summary> Replace Strict escapable characters with their escaped versions </summary>
+	/// <param name="str"></param>
+	/// <returns></returns>
+	public static string JsonFullEscapeString(this string str) {
+		return str.JsonEscapeString().Replace("/", "\\/");
+	}
+
+	/// <summary> Replace escaped characters with their unescaped versions, except '\u'. </summary>
 	public static string JsonUnescapeString(this string str) {
 		string s = str;
 		for (int i = 0; i < TOESCAPE.Length; i++) {
@@ -2864,7 +2946,7 @@ public static class JsonHelpers {
 
 			s = s.Replace(escapeCode, escaped);
 		}
-		return s;
+		return s.Replace("\\/", "/");
 	}
 
 	/// <summary> Array of numeric types </summary>
