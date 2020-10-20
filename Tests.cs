@@ -1,7 +1,7 @@
 // Unity detection
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019
+#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
 #define UNITY
-#if UNITY_2017 || UNITY_2018 || UNITY_2019
+#if UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
 #define COMP_SERVICES
 using System.Runtime.CompilerServices;
 #endif
