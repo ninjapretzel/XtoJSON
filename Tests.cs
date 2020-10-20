@@ -1166,6 +1166,21 @@ namespace JsonTests {
 					JsonObject expected = new JsonObject("a", true, "b", true, "c", true, "one", true, "two", true, "three", true);
 
 					parsed.ShouldEqual(expected);
+			}
+		}
+
+			public static void TestObjectsetParseStrict() {
+				{
+					string raw = @"
+{
+	a, b, c, one, two, three,
+}".Replace('\'', '\"');
+					Exception caught = null;
+					try {
+						JsonObject fail = Json.ParseStrict<JsonObject>(raw);
+					} catch (Exception e) { caught = e; }
+
+					caught.ShouldNotBe(null);
 
 				}
 			}
@@ -1191,6 +1206,21 @@ namespace JsonTests {
 					JsonArray expected = new JsonArray("a", "b", "c", "one", "two", "three");
 
 					parsed.ShouldEqual(expected);
+				}
+			}
+
+			public static void TestArraySetParseStrict() {
+				{
+					string raw = @"
+[
+	a, b, c, one, two, three
+]".Replace('\'', '\"');
+					Exception caught = null;
+					try {
+						JsonArray fail = Json.ParseStrict<JsonArray>(raw);
+					} catch (Exception e) { caught = e; }
+
+					caught.ShouldNotBe(null);
 
 				}
 			}
@@ -1218,6 +1248,10 @@ namespace JsonTests {
 					true.ShouldBe(obj.Equals(strParse));
 					true.ShouldBe(obj.Equals(ppParse));
 
+					JsonObject strStrict = Json.ParseStrict<JsonObject>(str);
+					JsonObject ppStrict = Json.ParseStrict<JsonObject>(pp);
+					true.ShouldBe(obj.Equals(strStrict));
+					true.ShouldBe(obj.Equals(ppStrict));
 				}
 			}
 			public static void TestBoolConversion() {
@@ -1480,6 +1514,12 @@ namespace JsonTests {
 					} catch (Exception e) {
 						throw new Exception($"Element {i} failed, json was:\n{json}\n...Failed to parse above json.\n\tparsed: {value}\n\texpected: {expected}", e);
 					}
+					
+					Exception caught = null;
+					try {
+						Json.ParseStrict<JsonObject>(json.Replace('\'', '\"'));
+					} catch (Exception e) { caught = e; }
+					caught.ShouldNotBe(null);
 				}
 			}
 			public static void TestArrays(string[] jsonLits, JsonArray expected) {
@@ -1494,6 +1534,12 @@ namespace JsonTests {
 					} catch (Exception e) {
 						throw new Exception($"Element {i} failed, json was:\n{json}\n...Failed to parse above json.\n\tparsed: {value}\n\texpected: {expected}", e);
 					}
+					
+					Exception caught = null;
+					try {
+						Json.ParseStrict<JsonArray>(json.Replace('\'', '\"'));
+					} catch (Exception e) { caught = e; }
+					caught.ShouldNotBe(null);
 				}
 			}
 			public static void TestLineComments() {
