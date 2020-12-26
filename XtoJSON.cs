@@ -1746,7 +1746,6 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 	public T Pull<T>(int index, T defaultValue = default(T)) {
 		if (index >= 0 && index < Count) {
 			JsonValue val = this[index];
-
 			if (val.JsonType == Json.ReflectedType(defaultValue)) { return Json.GetValue<T>(val); }
 		}
 		return defaultValue;
@@ -1926,44 +1925,12 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 	/// <summary> Get a list of all JsonObjects as T values  </summary>
 	/// <returns> List&lt;T&gt; of all of the JsonObjects in this JsonArray reflected into objects of type 'T' </returns>
 	public List<T> ToListOf<T>() {
-		Type type = typeof(T);
-		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
-		Type innerType = type.IsGenericType ? type.GetGenericArguments()[0] : null;
-		MethodInfo nullableGrabber = innerType != null ? JsonReflector.toNullable.MakeGenericMethod(new Type[] { innerType }) : null;
-		
-
 		List<T> arr = new List<T>(Count);
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
 			if (ReferenceEquals(val, null)) { val = JsonNull.instance; }
-			T sval = default(T);
-			bool setVal = false;
-
-			if (type.IsNullableType()) {
-				sval = (T)nullableGrabber.Invoke(null, new object[] { val });
-				setVal = true;
-			}
-			else if (val.isString && type == typeof(string)) { sval = (T)(object)val.stringVal; setVal = true; } 
-			else if (val.isNumber && type == typeof(double)) { sval = (T)(object)val.numVal; setVal = true; } 
-			else if (val.isNumber && type == typeof(int)) { sval = (T)(object)(int)val.numVal; setVal = true; } 
-			else if (val.isNumber && type == typeof(float)) { sval = (T)(object)(float)val.numVal; setVal = true; } 
-			else if (val.isNumber && type == typeof(byte)) { sval = (T)(object)(byte)val.numVal; setVal = true; } 
-			else if (val.isNumber && type == typeof(long)) { sval = (T)(object)(long)val.numVal; setVal = true; } 
-			else if (val.isBool && type == typeof(bool)) { sval = (T)(object)val.boolVal; setVal = true; }
-			else if (val.isNull) { sval = (T)(object)null; } 
-			else if (val.isObject) {
-				JsonObject jobj = val as JsonObject;
-				object obj;
-				if (type.IsValueType) {
-					obj = Json.GetValue(jobj, type);
-				} else {
-					obj = constructor.Invoke(new object[] { });
-					JsonReflector.ReflectInto(jobj, obj);
-				}
-				sval = (T)obj;
-				setVal = true;
-			}
-			if (setVal) { arr.Add(sval); }
+			T sval = Json.GetValue<T>(val);
+			arr.Add(sval);
 		}
 		return arr;
 	}
@@ -1972,25 +1939,13 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 	public object[] ToObjectArray(Type type) { return ToObjectList(type).ToArray(); }
 	/// <summary> Get a list of all JsonObjects as object values  </summary>
 	public List<object> ToObjectList(Type type) {
-		ConstructorInfo constructor = type.GetConstructor(new Type[] { });
-
+		
 		List<object> arr = new List<object>();
 		for (int i = 0; i < Count; i++) {
 			JsonValue val = this[i];
-			if (val.isString && type == typeof(string)) { arr.Add(val.stringVal); } 
-			else if (val.isNumber && type == typeof(double)) { arr.Add(val.numVal); } 
-			else if (val.isNumber && type == typeof(int)) { arr.Add((int)val.numVal); } 
-			else if (val.isNumber && type == typeof(float)) { arr.Add((float)val.numVal); }
-			else if (val.isNumber && type == typeof(byte)) { arr.Add((byte)val.numVal); } 
-			else if (val.isNumber && type == typeof(long)) { arr.Add((long)val.numVal); } 
-			else if (val.isBool && type == typeof(bool)) { arr.Add(val.boolVal); } 
-			else if (val.isNull) { arr.Add(null); } 
-			else if (val.isObject && constructor != null) {
-				object obj = constructor.Invoke(new object[] { });
-				JsonObject jobj = val as JsonObject;
-				JsonReflector.ReflectInto(jobj, obj);
-				arr.Add(obj);
-			}
+			if (ReferenceEquals(val, null)) { val = JsonNull.instance; }
+			object sval = Json.GetValue(val, type);
+			arr.Add(sval);
 		}
 
 
@@ -2193,26 +2148,28 @@ public static class JsonReflector {
 	public static HashSet<Type> blacklist = new HashSet<Type>();
 	
 	/// <summary> Custom, explicitly registered generators </summary>
-	private static Dictionary<Type, Func<JsonValue, object>> generators = new Dictionary<Type, Func<JsonValue, object>>();
+	// private static Dictionary<Type, Func<JsonValue, object>> generators = new Dictionary<Type, Func<JsonValue, object>>();
+	private static IDictionary<Type, Delegate> generators = new ConcurrentDictionary<Type, Delegate>();
 
 	/// <summary> Custom, explicitly registered reflectors </summary>
-	private static Dictionary<Type, Func<object, JsonValue>> reflectors = new Dictionary<Type, Func<object, JsonValue>>();
+	//private static Dictionary<Type, Func<object, JsonValue>> reflectors = new Dictionary<Type, Func<object, JsonValue>>();
+	private static IDictionary<Type, Delegate> reflectors = new ConcurrentDictionary<Type, Delegate>();
 
 	/// <summary> Registers a custom generator for the given type </summary>
 	/// <typeparam name="T"> Generic type to know what type to bind to </typeparam>
 	/// <param name="generator"> Function taking a JsonValue and yielding a T </param>
-	public static void RegisterGenerator<T>(Func<JsonValue, object> generator) { generators[typeof(T)] = generator; }
+	public static void RegisterGenerator<T>(Func<JsonValue, T> generator) { generators[typeof(T)] = generator; }
 	/// <summary> Removes the generator for the given type, if you need to clean up your mess. </summary>
 	/// <typeparam name="T"> Generic type to know what type to unbind </typeparam>
-	public static void UnregisterGenerator<T>() { generators.Remove(typeof(T)); }
+	public static void UnregisterGenerator<T>() { generators.Remove(typeof(T)); CACHED_GENERATORS.Remove(typeof(T)); }
 
 	/// <summary> Registers a custom reflector for the given type </summary>
 	/// <typeparam name="T"> Generic type to know what type to bind to </typeparam>
 	/// <param name="generator"> Function taking a T and yielding a JsonValue </param>
-	public static void RegisterReflector<T>(Func<object, JsonValue> reflector) { reflectors[typeof(T)] = reflector; }
+	public static void RegisterReflector<T>(Func<T, JsonValue> reflector) { reflectors[typeof(T)] = reflector; }
 	/// <summary> Removes the reflector for the given type, if you need to clean up your mess. </summary>
 	/// <typeparam name="T"> Generic type to know what type to unbind </typeparam>
-	public static void UnregisterReflector<T>() { reflectors.Remove(typeof(T)); }
+	public static void UnregisterReflector<T>() { reflectors.Remove(typeof(T)); CACHED_REFLECTORS.Remove(typeof(T)); }
 
 	/// <summary> Blacklist a given type from being reflected </summary>
 	/// <param name="t">Type to blacklist</param>
@@ -2261,7 +2218,11 @@ public static class JsonReflector {
 	public static readonly IDictionary<Type, Func<JsonValue, object>> CACHED_GENERATORS = new ConcurrentDictionary<Type, Func<JsonValue, object>>();
 	public static readonly object[] NO_PARAMETERS = new object[0];
 	public static Func<object, JsonValue> REFLECTOR(Type t) {
-		if (CACHED_REFLECTORS.ContainsKey(t)) { return CACHED_REFLECTORS[t]; }
+		bool hadCache = CACHED_REFLECTORS.ContainsKey(t);
+		if (!hadCache && reflectors.ContainsKey(t)) {
+			return CACHED_REFLECTORS[t] = (obj) => { return (JsonValue)reflectors[t].Method.Invoke(null, new object[] { obj } ); };
+		}
+		if (hadCache) { return CACHED_REFLECTORS[t]; }
 		MethodInfo info = t.GetMethod("ToJson", BindingFlags.Instance | BindingFlags.Public);
 		if (info != null && info.ReturnType == typeof(JsonValue)) {
 			CACHED_REFLECTORS[t] = (obj) => { return (JsonValue)info.Invoke(obj, NO_PARAMETERS); };
@@ -2271,7 +2232,11 @@ public static class JsonReflector {
 		return CACHED_REFLECTORS[t];
 	}
 	public static Func<JsonValue, object> GENERATOR(Type t) {
-		if (CACHED_GENERATORS.ContainsKey(t)) { return CACHED_GENERATORS[t]; }
+		bool hadCache = CACHED_GENERATORS.ContainsKey(t);
+		if (!hadCache && generators.ContainsKey(t)) {
+			return CACHED_GENERATORS[t] = (jval) => { return generators[t].Method.Invoke(null, new object[] { jval } ); };
+		}
+		if (hadCache) { return CACHED_GENERATORS[t]; }
 		MethodInfo info = t.GetMethod("FromJson", BindingFlags.Static | BindingFlags.Public);
 		Func<JsonValue, object> generator = null;
 		if (info != null && info.ReturnType == t) {
@@ -2317,9 +2282,7 @@ public static class JsonReflector {
 		else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } 
 		else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } 
 		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } 
-		// Explicitly registered generators for objects/arrays take top priority
-		else if (generators.ContainsKey(destType)) { sval = generators[destType](val); }
-		// Next, implicitly registered generators are used. 
+		// Internally, explicitly registered generators take top priority, then implicitly registered generators. 
 		else if ((generator = GENERATOR(destType)) != null) { sval = generator(val); }
 		// Otherwise automatic reflection is used
 		else if (val.isArray && destType.IsArray) {
@@ -2492,9 +2455,7 @@ public static class JsonReflector {
 		else if (type == typeof(short)) { return ((short)source); } 
 		else if (type == typeof(bool)) { return ((bool)source); } 
 		else if (type == typeof(Guid)) { return (source.ToString()); }
-		// For objects/arrays, explicitly registered reflectors take top priority
-		else if (reflectors.ContainsKey(type)) { return reflectors[type](source); }
-		// Next, implicitly registered reflectors
+		// Internally explicitly registered reflectors take top priority, then implicitly registered reflectors
 		else if ((reflector = REFLECTOR(type)) != null) { return reflector(source); }
 		// Otherwise, resume automatic reflection
 		else if (type.IsArray) {

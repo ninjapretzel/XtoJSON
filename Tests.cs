@@ -608,43 +608,69 @@ namespace JsonTests {
 				}
 			}
 			
+			public static Vector2 ToVector2(JsonValue data) {
+				if (data.isObject) {
+					JsonObject obj = (JsonObject)data;
+					return new Vector2(obj.Pull("x", 0f), obj.Pull("y", 0f));
+				} else if (data.isArray) {
+					JsonArray arr = (JsonArray)data;
+					return new Vector2(arr.Pull(0, 0f), arr.Pull(1, 0f));
+				}
+				return new Vector2();
+			}
+			public static Vector3 ToVector3(JsonValue data) {
+				if (data.isObject) {
+					JsonObject obj = (JsonObject)data;
+					return new Vector3(obj.Pull("x", 0f), obj.Pull("y", 0f), obj.Pull("z", 0f));
+				} else if (data.isArray) {
+					JsonArray arr = (JsonArray)data;
+					return new Vector3(arr.Pull(0, 0f), arr.Pull(1, 0f), arr.Pull(2, 0f));
+				}
+				return new Vector3();
+			}
+			public static Vector4 ToVector4(JsonValue data) {
+				if (data.isObject) {
+					JsonObject obj = (JsonObject)data;
+					return new Vector4(obj.Pull("x", 0f), obj.Pull("y", 0f), obj.Pull("z", 0f), obj.Pull("w", 0f));
+				} else if (data.isArray) {
+					JsonArray arr = (JsonArray)data;
+					return new Vector4(arr.Pull(0, 0f), arr.Pull(1, 0f), arr.Pull(2, 0f), arr.Pull(3, 0f));
+				}
+				return new Vector4();
+			}
+			public static JsonValue Vector2ToJsonArray(Vector2 v) { return new JsonArray(v.x, v.y); }
+			public static JsonValue Vector3ToJsonArray(Vector3 v) { return new JsonArray(v.x, v.y, v.z); }
+			public static JsonValue Vector4ToJsonArray(Vector4 v) { return new JsonArray(v.x, v.y, v.z, v.w); }
 			public static void TestExplicitReflectorGenerator() {
-				JsonReflector.RegisterGenerator<Vector3>((data) => {
-					if (data.isObject) {
-						JsonObject obj = (JsonObject)data;
-						return new Vector3(obj.Pull("x", 0f), obj.Pull("y", 0f), obj.Pull("z", 0f));
-					} else if (data.isArray) {
-						JsonArray arr = (JsonArray)data;
-						return new Vector3(arr.Get<float>(0), arr.Get<float>(1), arr.Get<float>(2));
-					}
-					return new Vector3();
-				});
-				JsonReflector.RegisterReflector<Vector3>((o) => {
-					Vector3 v = (Vector3)o;
-					return new JsonArray(v.x, v.y, v.z);
-				});
+				JsonReflector.RegisterGenerator<Vector3>(ToVector3);
+				JsonReflector.RegisterReflector<Vector3>(Vector3ToJsonArray);
+				// wtb defer
+				// defer JsonReflector.UnregisterGenerator<Vector3>();
+				// defer JsonReflector.UnregisterReflector<Vector3>();
+				try {
 
-				Vector3 testValue= new Vector3(1,2,3);
+					Vector3 testValue= new Vector3(1,2,3);
 
-				JsonValue reflected = Json.Reflect(testValue);
-				reflected.ToString().ShouldEqual("[1,2,3]");
+					JsonValue reflected = Json.Reflect(testValue);
+					reflected.ToString().ShouldEqual("[1,2,3]");
 
-				Vector3 restored = Json.GetValue<Vector3>(reflected);
+					Vector3 restored = Json.GetValue<Vector3>(reflected);
 
-				JsonValue objJsonValue = new JsonObject("x", 1, "y", 2, "z", 3);
-				Vector3 objRestored = Json.GetValue<Vector3>(objJsonValue);
-				Vector3 directArr = Json.To<Vector3>("[1,2,3]");
-				Vector3 directObj = Json.To<Vector3>("{x:1,y:2,z:3}");
+					JsonValue objJsonValue = new JsonObject("x", 1, "y", 2, "z", 3);
+					Vector3 objRestored = Json.GetValue<Vector3>(objJsonValue);
+					Vector3 directArr = Json.To<Vector3>("[1,2,3]");
+					Vector3 directObj = Json.To<Vector3>("{x:1,y:2,z:3}");
 
 
-				restored.x.ShouldBe(1); restored.y.ShouldBe(2); restored.z.ShouldBe(3);
-				objRestored.x.ShouldBe(1); objRestored.y.ShouldBe(2); objRestored.z.ShouldBe(3);
-				directArr.x.ShouldBe(1); directArr.y.ShouldBe(2); directArr.z.ShouldBe(3);
-				directObj.x.ShouldBe(1); directObj.y.ShouldBe(2); directObj.z.ShouldBe(3);
+					restored.x.ShouldBe(1); restored.y.ShouldBe(2); restored.z.ShouldBe(3);
+					objRestored.x.ShouldBe(1); objRestored.y.ShouldBe(2); objRestored.z.ShouldBe(3);
+					directArr.x.ShouldBe(1); directArr.y.ShouldBe(2); directArr.z.ShouldBe(3);
+					directObj.x.ShouldBe(1); directObj.y.ShouldBe(2); directObj.z.ShouldBe(3);
 
-
-				JsonReflector.UnregisterGenerator<Vector3>();
-				JsonReflector.UnregisterReflector<Vector3>();
+				} finally {
+					JsonReflector.UnregisterGenerator<Vector3>();
+					JsonReflector.UnregisterReflector<Vector3>();
+				}
 			}
 
 			public static void TestShouldFailIfUnregisterCallsFail() {
@@ -654,12 +680,8 @@ namespace JsonTests {
 				reflected.isArray.ShouldBeFalse();
 
 				
-				try {
-					Vector3 restored = Json.To<Vector3>("[1,2,3]");
-				} catch (Exception e) {
-
-				}
-
+				Vector3 restored = Json.To<Vector3>("[1,2,3]");
+				
 
 			}
 
@@ -695,6 +717,97 @@ namespace JsonTests {
 				objRestored.y.ShouldBe(2);
 				restored.z.ShouldBe(3);
 				objRestored.z.ShouldBe(3);
+			}
+
+			public class SomethingWithList {
+				public List<Vector3> stuff = new List<Vector3>();
+			}
+
+			public static void TestListCoercion() {
+				SomethingWithList a = new SomethingWithList();
+				a.stuff.Add(new Vector3(1,2,3));
+				a.stuff.Add(new Vector3(4,5,6));
+				a.stuff.Add(new Vector3(7,8,9));
+
+				JsonObject obj = Json.Reflect(a) as JsonObject;
+
+				obj.Count.ShouldBe(1);
+				obj["stuff"].Count.ShouldBe(3);
+				
+				SomethingWithList b = Json.GetValue<SomethingWithList>(obj);
+				b.stuff[0].ShouldEqual(new Vector3(1,2,3));
+				b.stuff[1].ShouldEqual(new Vector3(4,5,6));
+				b.stuff[2].ShouldEqual(new Vector3(7,8,9));
+				
+				void testOtherVectors() {
+					JsonArray arr = obj["stuff"] as JsonArray;
+					List<Vector3> vec3s = arr.ToListOf<Vector3>();
+					vec3s[0].ShouldEqual(new Vector3(1, 2, 3));
+					vec3s[1].ShouldEqual(new Vector3(4, 5, 6));
+					vec3s[2].ShouldEqual(new Vector3(7, 8, 9));
+
+					List<Vector2> vec2s = arr.ToListOf<Vector2>();
+					vec2s[0].ShouldEqual(new Vector2(1, 2));
+					vec2s[1].ShouldEqual(new Vector2(4, 5));
+					vec2s[2].ShouldEqual(new Vector2(7, 8));
+
+					List<Vector4> vec4s = arr.ToListOf<Vector4>();
+					vec4s[0].ShouldEqual(new Vector4(1, 2, 3, 0));
+					vec4s[1].ShouldEqual(new Vector4(4, 5, 6, 0));
+					vec4s[2].ShouldEqual(new Vector4(7, 8, 9, 0));
+				}
+				testOtherVectors();
+
+				JsonReflector.RegisterGenerator<Vector2>(ToVector2);
+				JsonReflector.RegisterGenerator<Vector3>(ToVector3);
+				JsonReflector.RegisterGenerator<Vector4>(ToVector4);
+				JsonReflector.RegisterReflector<Vector3>(Vector3ToJsonArray);
+				// wtb defer
+				// defer JsonReflector.UnregisterGenerator<Vector3>();
+				// defer JsonReflector.UnregisterReflector<Vector3>();
+				try {
+					obj = Json.Reflect(a) as JsonObject;
+
+					SomethingWithList c= Json.GetValue<SomethingWithList>(obj);
+					c.stuff[0].ShouldEqual(new Vector3(1, 2, 3));
+					c.stuff[1].ShouldEqual(new Vector3(4, 5, 6));
+					c.stuff[2].ShouldEqual(new Vector3(7, 8, 9));
+
+					testOtherVectors();
+				} finally {
+					JsonReflector.UnregisterGenerator<Vector2>();
+					JsonReflector.UnregisterGenerator<Vector3>();
+					JsonReflector.UnregisterGenerator<Vector4>();
+					JsonReflector.UnregisterReflector<Vector3>();
+				}
+			}
+
+			public class SomethingWithNullableList {
+				public List<int?> stuff = new List<int?>();
+			}
+			public static void TestReflectionWithNullable() {
+				SomethingWithNullableList a = new SomethingWithNullableList();
+				a.stuff.Add(1);
+				a.stuff.Add(2);
+				a.stuff.Add(3);
+				a.stuff.Add(null);
+				a.stuff.Add(4);
+				a.stuff.Add(5);
+				a.stuff.Add(6);
+
+				JsonObject obj = Json.Reflect(a) as JsonObject;
+				obj["stuff"].Count.ShouldBe(7);
+
+				SomethingWithNullableList b = Json.GetValue<SomethingWithNullableList>(obj);
+				b.stuff[0].ShouldEqual(1);
+				b.stuff[1].ShouldEqual(2);
+				b.stuff[2].ShouldEqual(3);
+				(b.stuff[3]==null).ShouldBeTrue();
+				b.stuff[4].ShouldEqual(4);
+				b.stuff[5].ShouldEqual(5);
+				b.stuff[6].ShouldEqual(6);
+
+
 			}
 
 		}
