@@ -99,7 +99,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 5;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 0;
+	public const int REV = 1;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -2568,13 +2568,20 @@ public static class JsonReflector {
 public class JsonDeserializeFailedException : Exception {
 	/// <summary> Current parser state </summary>
 	public JsonDeserializer state { get; private set; }
+	/// <summary> Internal message </summary>
+	public string msg { get; private set; }
 	/// <summary> Current line number </summary>
 	public int line { get { return state.line; } }
 	/// <summary> Current number of characters read on line </summary>
 	public int col { get { return state.col; } }
-	public JsonDeserializeFailedException(string msg, JsonDeserializer state) : base(msg + $" @{state.line}:{state.col}") {
+	public JsonDeserializeFailedException(string msg, JsonDeserializer state) 
+			: base() 
+	{
+		this.msg = msg;
 		this.state = state;
 	}
+	/// <summary> Overrided to prevent doing a <see cref="JsonDeserializer.ToString"/> in the constructor. </summary>
+	public override string Message { get { return $"{msg}{state}"; } }
 }
 
 /// <summary> Class holding logic for parsing Json text into JsonValues 
@@ -2582,7 +2589,7 @@ public class JsonDeserializeFailedException : Exception {
 public class JsonDeserializer {
 
 	/// <summary> Json text that is being parsed </summary>
-	private string json;
+	public string json { get; private set; }
 	/// <summary> Internal index. Do not modify outside of <see cref="index"/>.set </summary>
 	private int __index;
 	/// <summary> Current position. </summary>
@@ -2604,13 +2611,48 @@ public class JsonDeserializer {
 		}
 	}
 
+	public override string ToString() {
+		char c = cur;
+		string s = ""+c;
+		if (c == ' ') { s = "SPACE"; }
+		if (c == '\n') { s = "\\n"; }
+		if (c == '\r') { s = "\\r"; }
+		if (c == '\t') { s = "\\t"; }
+		StringBuilder area = new StringBuilder();
+		string[] split = json.Split('\n');
+		//Console.WriteLine($"ToString at {line},{col} in\n{json}");
+		if (split.Length > 1) {
+			int from = line - 5; if (from < 0) { from = 0; }
+			int to = line + 5; if (to >= split.Length) { to = split.Length-1; }
+
+			for (int i = from; i <= to; i++) {
+				string si = "" + i;
+				int spaces = 5 - si.Length;
+				for (int k = 0; k < spaces; k++) { area.Append(' '); }
+				area.Append(si);
+				area.Append(':');
+				if (line == i) {
+					area.Append("->");
+				} else {
+					area.Append("  ");
+				}
+				//Console.WriteLine($"From {from} to {to} at {i} / {split.Length}");
+				area.Append(split[i]);
+				area.Append("\n");
+			}
+		} else {
+			area.Append(json);
+		}
+		return $"@{line}:{col} cur='{s}', in\n{area}";
+	}
+
 	/// <summary> Current line number </summary>
 	public int line { get; private set; }
 	/// <summary> Current number of characters read on line </summary>
 	public int col { get; private set; }
 
 	/// <summary> quick access to the current character </summary>
-	private char cur { get { return json[index]; } }
+	public char cur { get { return json[index]; } }
 
 	/// <summary> quick access to the previous character, or a nullchar </summary>
 	private char prev { get { return index > 0 ? json[index-1] : '\0'; } }
@@ -2657,7 +2699,6 @@ public class JsonDeserializer {
 		if (double.TryParse(jval, out dval)) { return dval; }
 
 		return jval;
-
 	}
 	
 	/// <summary> Logic for parsing content of a string </summary>
@@ -2838,7 +2879,7 @@ public class JsonDeserializer {
 			if (cur == '"') { return ProcessString().JsonUnescapeString(); }
 
 			int startIndex = index;
-			while (index < json.Length && !char.IsWhiteSpace(cur)) { index++; }
+			while (index < json.Length && cur != ',' && cur != '}' && cur != ']' && !char.IsWhiteSpace(cur)) { index++; }
 			string jval = json.Substring(startIndex, index - startIndex);
 			if (jval == "true") { return JsonBool.TRUE; }
 			if (jval == "false") { return JsonBool.FALSE; }
@@ -2856,9 +2897,12 @@ public class JsonDeserializer {
 			if (cur == ']') { index++; return arr; }
 			while (true) {
 				JsonValue val = LintValue();
+				arr.Add(val);
 				Skip();
 				if (cur == ']') { index++; break; }
 				if (cur != ',') { throw new JsonDeserializeFailedException("Strict Json requires ',' separating array values", this); }
+				index++;
+				Skip();
 			}
 			return arr;
 		}
@@ -2874,11 +2918,14 @@ public class JsonDeserializer {
 				Skip();
 				if (cur != ':') { throw new JsonDeserializeFailedException("Strict Json requires ':' after object key", this); }
 				index++;
+				Skip();
 				JsonValue value = LintValue();
 				obj.Add(key, value);
 				Skip();
 				if (cur == '}') { index++; break; }
 				if (cur != ',') { throw new JsonDeserializeFailedException("Strict Json requires ',' separating object pairs", this); }
+				index++;
+				Skip();
 			}
 			return obj;
 		}
@@ -3290,6 +3337,10 @@ public static class JsonOperations {
 		return source;
 	}
 
+	/// <summary> Gets the <see cref="JsonValue"/> in <paramref name="src"/> at the given <paramref name="path"/>, or null. </summary>
+	/// <param name="src"> Source <see cref="JsonObject"/> or <see cref="JsonArray"/> to trace</param>
+	/// <param name="path"> Path to follow, names and/or indexes separated by '.' and/or '/'. </param>
+	/// <returns> Either the <see cref="JsonValue"/> at the given path, or null if the path cannot be traced. </returns>
 	public static JsonValue XPath(this JsonValue src, string path) {
 		if (src != null) {
 			JsonValue trace = src;
@@ -3306,6 +3357,11 @@ public static class JsonOperations {
 		return JsonNull.instance;
 	}
 
+	/// <summary> Gets the <typeparamref name="T"/> in <paramref name="src"/> at the given <paramref name="path"/>, or null. </summary>
+	/// <typeparam name="T"> Generic type to get </typeparam>
+	/// <param name="src"> Source <see cref="JsonObject"/> or <see cref="JsonArray"/> to trace</param>
+	/// <param name="path"> Path to follow, names and/or indexes separated by '.' and/or '/'. </param>
+	/// <returns> Either the <typeparamref name="T"/> at the given path, or null if the path cannot be traced. </returns>
 	public static T XPath<T>(this JsonValue src, string path) where T : JsonValue {
 		if (src != null) {
 			JsonValue trace = src;
@@ -3340,7 +3396,6 @@ namespace XtoJSON {
 			if (dataObj != null) {
 				Json.ReflectInto(dataObj, target);
 			}
-
 		}
 
 		/// <summary> More formal name for Parse() </summary>
@@ -3352,7 +3407,6 @@ namespace XtoJSON {
 		public static JsonValue ReflectJson(this object obj) { return Json.Reflect(obj); }
 		/// <summary> More formal name for Reflect() </summary>
 		public static JsonValue SerializeJson(this object obj) { return Json.Reflect(obj); }
-
 
 	}
 
