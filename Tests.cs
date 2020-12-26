@@ -607,6 +607,96 @@ namespace JsonTests {
 					reflected.ShouldEqual(model);
 				}
 			}
+			
+			public static void TestExplicitReflectorGenerator() {
+				JsonReflector.RegisterGenerator<Vector3>((data) => {
+					if (data.isObject) {
+						JsonObject obj = (JsonObject)data;
+						return new Vector3(obj.Pull("x", 0f), obj.Pull("y", 0f), obj.Pull("z", 0f));
+					} else if (data.isArray) {
+						JsonArray arr = (JsonArray)data;
+						return new Vector3(arr.Get<float>(0), arr.Get<float>(1), arr.Get<float>(2));
+					}
+					return new Vector3();
+				});
+				JsonReflector.RegisterReflector<Vector3>((o) => {
+					Vector3 v = (Vector3)o;
+					return new JsonArray(v.x, v.y, v.z);
+				});
+
+				Vector3 testValue= new Vector3(1,2,3);
+
+				JsonValue reflected = Json.Reflect(testValue);
+				reflected.ToString().ShouldEqual("[1,2,3]");
+
+				Vector3 restored = Json.GetValue<Vector3>(reflected);
+
+				JsonValue objJsonValue = new JsonObject("x", 1, "y", 2, "z", 3);
+				Vector3 objRestored = Json.GetValue<Vector3>(objJsonValue);
+				Vector3 directArr = Json.To<Vector3>("[1,2,3]");
+				Vector3 directObj = Json.To<Vector3>("{x:1,y:2,z:3}");
+
+
+				restored.x.ShouldBe(1); restored.y.ShouldBe(2); restored.z.ShouldBe(3);
+				objRestored.x.ShouldBe(1); objRestored.y.ShouldBe(2); objRestored.z.ShouldBe(3);
+				directArr.x.ShouldBe(1); directArr.y.ShouldBe(2); directArr.z.ShouldBe(3);
+				directObj.x.ShouldBe(1); directObj.y.ShouldBe(2); directObj.z.ShouldBe(3);
+
+
+				JsonReflector.UnregisterGenerator<Vector3>();
+				JsonReflector.UnregisterReflector<Vector3>();
+			}
+
+			public static void TestShouldFailIfUnregisterCallsFail() {
+				Vector3 v = new Vector3(1,2,3);
+				JsonValue reflected = Json.Reflect(v);
+
+				reflected.isArray.ShouldBeFalse();
+
+				
+				try {
+					Vector3 restored = Json.To<Vector3>("[1,2,3]");
+				} catch (Exception e) {
+
+				}
+
+
+			}
+
+			public class Vector3_IRG {
+				public float x, y, z;
+				public Vector3_IRG(float x, float y, float z) { this.x = x; this.y = y; this.z = z; }
+				public static Vector3_IRG FromJson(JsonValue data) {
+					if (data.isObject) {
+						JsonObject obj = (JsonObject) data;
+						return new Vector3_IRG(obj.Pull("x", 0f), obj.Pull("y", 0f), obj.Pull("z", 0f));
+					} else if (data.isArray) {
+						JsonArray arr = (JsonArray) data;
+						return new Vector3_IRG(arr.Get<float>(0), arr.Get<float>(1), arr.Get<float>(2));
+					}
+					return null;
+				}
+				public JsonValue ToJson() { return new JsonArray(x, y, z); }
+			}
+			public static void TestImplicitReflectorGenerator() {
+				Vector3_IRG testValue = new Vector3_IRG(1, 2, 3);
+
+				JsonValue reflected = Json.Reflect(testValue);
+				reflected.ToString().ShouldEqual("[1,2,3]");
+
+				Vector3_IRG restored = Json.GetValue<Vector3_IRG>(reflected);
+				
+				JsonValue objJsonValue = new JsonObject("x", 1, "y", 2, "z", 3);
+				Vector3_IRG objRestored = Json.GetValue<Vector3_IRG>(objJsonValue);
+
+				restored.x.ShouldBe(1);
+				objRestored.x.ShouldBe(1);
+				restored.y.ShouldBe(2);
+				objRestored.y.ShouldBe(2);
+				restored.z.ShouldBe(3);
+				objRestored.z.ShouldBe(3);
+			}
+
 		}
 
 		/// <summary> Test holding JsonObject test functions </summary>
