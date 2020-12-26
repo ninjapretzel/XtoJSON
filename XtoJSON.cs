@@ -99,7 +99,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 5;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 1;
+	public const int REV = 2;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -2265,6 +2265,7 @@ public static class JsonReflector {
 			sval = genericGrabber.Invoke(null, new object[] { val });
 		} 
 		else if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
+		else if (val.isString && destType == typeof(Guid)) { sval = Guid.Parse(val.stringVal); }
 		else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
@@ -2452,6 +2453,7 @@ public static class JsonReflector {
 		else if (type == typeof(long)) { return ((long)source); } 
 		else if (type == typeof(short)) { return ((short)source); } 
 		else if (type == typeof(bool)) { return ((bool)source); } 
+		else if (type == typeof(Guid)) { return (source.ToString()); }
 		else if (type.IsArray) {
 			JsonArray arr = new JsonArray();
 			jval = arr;
