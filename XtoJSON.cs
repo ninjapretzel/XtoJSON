@@ -99,7 +99,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 5;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 2;
+	public const int REV = 3;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -224,7 +224,7 @@ public static class Json {
 		if (t == typeof(bool)) { return JsonType.Boolean; }
 		if (t.IsNumeric()) { return JsonType.Number; }
 
-
+		if (t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(List<>))) { return JsonType.Array; }
 		if (t.IsArray) { return JsonType.Array; }
 
 		return JsonType.Object;
