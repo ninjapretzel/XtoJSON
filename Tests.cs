@@ -510,6 +510,7 @@ namespace JsonTests {
 	
 
 	}
+	
 	public static class Json_Tests {
 		////////////////////////////////////////////////////////////////////////////////////////////////
 		///////////////////////////////////////////////////////////////////////////////////////////////
@@ -607,7 +608,10 @@ namespace JsonTests {
 					reflected.ShouldEqual(model);
 				}
 			}
-			
+
+			public struct Vector2 { public float x, y; public Vector2(float a, float b) { x = a; y = b; } }
+			public struct Vector3 { public float x, y, z; public Vector3(float a, float b, float c) { x = a; y = b; z = c; } }
+			public struct Vector4 { public float x, y, z, w; public Vector4(float a, float b, float c, float d) { x = a; y = b; z = c; w = d; } }
 			public static Vector2 ToVector2(JsonValue data) {
 				if (data.isObject) {
 					JsonObject obj = (JsonObject)data;
@@ -1608,12 +1612,15 @@ namespace JsonTests {
 
 				{ // JsonBool
 					JsonBool a = true;
+					JsonBool b = true;
 					JsonBool c = false;
+					JsonBool d = false;
 
-					TestFramework.ShouldBeTrue(a);
+					a.ShouldEqual(true);
+					(a == b).ShouldBeTrue();
 					(a != c).ShouldBeTrue();
-					TestFramework.ShouldBeFalse(c);
-			
+					c.ShouldEqual(false);
+					(c == d).ShouldBeTrue();
 				}
 
 				{ // JsonObject
@@ -1670,7 +1677,7 @@ namespace JsonTests {
 
 					model.nullFloat.HasValue.ShouldBeFalse();
 					model.nullInt.HasValue.ShouldBeFalse();
-					model.nullIntArray.ShouldBe(null);
+					(null == model.nullIntArray).ShouldBeTrue();
 				}
 
 				{
@@ -1888,11 +1895,124 @@ thing//
 
 			}
 		}
-	
+
 		////////////////////////////////////////////////////////////////////////////////////////////////
 		///////////////////////////////////////////////////////////////////////////////////////////////
 		//////////////////////////////////////////////////////////////////////////////////////////////
 
+		public static class TestStrict {
+			public static void TestStrictObjectParse() {
+				string goodInput =
+	@"{'name':'bob','str':7,'dex':8,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion':3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false,'cool':true}".Replace('\'', '\"').Replace("\n", "");
+
+				string[] badInputs = new string[] {
+@"{'name':'bob' 'str':7,'dex':8,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion':3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false,'cool':true}".Replace('\'', '\"').Replace("\n", ""),
+
+@"{'name':'bob','str':7,'dex':8,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion':3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false,'cool':true,}".Replace('\'', '\"').Replace("\n", ""),
+
+@"{'name':'bob','str':7,'dex':8,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion'3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false,'cool':true}".Replace('\'', '\"').Replace("\n", ""),
+
+@"{'name':'bob','str':7,'dex':8,,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion':3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false,'cool':true}".Replace('\'', '\"').Replace("\n", ""),
+
+@"{'name':'bob','str':7,'dex':8,'vit':5,'agi':6,
+'bag':{'potion':20,'hi-potion':3},'wallet': {'gil': 230,'shards': 23},
+'awesome':false}'cool':true}".Replace('\'', '\"').Replace("\n", "")
+
+			};
+
+				JsonObject expected = new JsonObject();
+				expected["name"] = "bob";
+				expected["str"] = 7;
+				expected["dex"] = 8;
+				expected["vit"] = 5;
+				expected["agi"] = 6;
+				expected["bag"] = new JsonObject("potion", 20, "hi-potion", 3);
+				expected["wallet"] = new JsonObject("gil", 230, "shards", 23);
+				expected["awesome"] = false;
+				expected["cool"] = true;
+
+				JsonObject parsed = Json.ParseStrict<JsonObject>(goodInput);
+				parsed.ShouldEqual(expected);
+				string toStringed = parsed.ToString();
+				string prettyPrinted = parsed.PrettyPrint();
+				JsonObject reparsed1 = Json.ParseStrict<JsonObject>(toStringed);
+				JsonObject reparsed2 = Json.ParseStrict<JsonObject>(prettyPrinted);
+
+				reparsed1.ShouldEqual(expected);
+				reparsed2.ShouldEqual(expected);
+
+				foreach (var bad in badInputs) {
+					Exception e = null;
+					try {
+						JsonObject badParsed = Json.ParseStrict<JsonObject>(bad);
+					} catch (Exception ex) {
+						e = ex;
+					}
+					e.ShouldNotBe(null);
+
+				}
+
+
+			}
+
+			public static void TestStrictArrayParse() {
+				string goodInput =
+	@"[1,2,3,'a','b','c',[123,456,789,0],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", "");
+
+				string[] badInputs = new string[] {
+@"[1,2 3,'a','b','c',[123,456,789,0],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3 'a','b','c',[123,456,789,0],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3,'a','b','c' [123,456,789,0],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3,'a','b','c',[123,456,789,0,],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3,'a','b','c',[123,456,789,0] {'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3,'a','b','c',[123,456,789,0]],{'1':2,'3':'a','b':'c'}]".Replace('\'', '\"').Replace("\n", ""),
+@"[1,2,3,'a','b','c',[123,456,789,0],{'1':2,'3':'a','b':'c'},]".Replace('\'', '\"').Replace("\n", ""),
+
+
+			};
+
+				JsonArray expected = new JsonArray(1, 2, 3, "a", "b", "c",
+					new JsonArray(123, 456, 789, 0),
+					new JsonObject("1", 2, "3", "a", "b", "c"));
+
+				JsonArray parsed = Json.ParseStrict<JsonArray>(goodInput);
+				parsed.ShouldEqual(expected);
+				string toStringed = parsed.ToString();
+				string prettyPrinted = parsed.PrettyPrint();
+
+				JsonArray reparsed1 = Json.ParseStrict<JsonArray>(toStringed);
+				JsonArray reparsed2 = Json.ParseStrict<JsonArray>(prettyPrinted);
+
+				reparsed1.ShouldEqual(expected);
+				reparsed2.ShouldEqual(expected);
+
+
+				foreach (var bad in badInputs) {
+					Exception e = null;
+					try {
+						JsonObject badParsed = Json.ParseStrict<JsonObject>(bad);
+					} catch (Exception ex) {
+						e = ex;
+					}
+					e.ShouldNotBe(null);
+				}
+
+			}
+
+		}
+		////////////////////////////////////////////////////////////////////////////////////////////////
+		///////////////////////////////////////////////////////////////////////////////////////////////
+		//////////////////////////////////////////////////////////////////////////////////////////////
 
 
 
