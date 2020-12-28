@@ -99,7 +99,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 6;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 0;
+	public const int REV = 1;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -2155,6 +2155,15 @@ public static class JsonReflector {
 	//private static Dictionary<Type, Func<object, JsonValue>> reflectors = new Dictionary<Type, Func<object, JsonValue>>();
 	private static IDictionary<Type, Delegate> reflectors = new ConcurrentDictionary<Type, Delegate>();
 
+	/// <summary> Register both reflection and generation conversions for a type. </summary>
+	/// <typeparam name="T"> Generic type. </typeparam>
+	/// <param name="generator"> Function taking <see cref="JsonValue"/> and returning <typeparamref name="T"/> </param>
+	/// <param name="reflector"> Function taking <typeparamref name="T"/> and returning <see cref="JsonValue"/> </param>
+	public static void RegisterConversions<T>(Func<JsonValue, T> generator, Func<T, JsonValue> reflector) {
+		RegisterGenerator(generator);
+		RegisterReflector(reflector);
+	}
+
 	/// <summary> Registers a custom generator for the given type </summary>
 	/// <typeparam name="T"> Generic type to know what type to bind to </typeparam>
 	/// <param name="generator"> Function taking a JsonValue and yielding a T </param>
@@ -2265,6 +2274,7 @@ public static class JsonReflector {
 		} 
 		else if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
 		else if (val.isString && destType == typeof(Guid)) { sval = Guid.Parse(val.stringVal); }
+		else if (val.isString && destType == typeof(DateTime)) { sval = DateTime.Parse(val.stringVal); }
 		else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
@@ -2292,7 +2302,7 @@ public static class JsonReflector {
 			MethodInfo genericGrabber = toArrayOf.MakeGenericMethod(eleType);
 			sval = genericGrabber.Invoke(arr, new object[] { });
 
-		} else if (typeof(IList).IsAssignableFrom(destType)) {
+		} else if (val.isArray && typeof(IList).IsAssignableFrom(destType)) {
 			JsonArray arr = val as JsonArray;
 			Type eleType;
 			if (JsonHelpers.TryListOfWhat(destType, out eleType)) {
@@ -2455,6 +2465,7 @@ public static class JsonReflector {
 		else if (type == typeof(short)) { return ((short)source); } 
 		else if (type == typeof(bool)) { return ((bool)source); } 
 		else if (type == typeof(Guid)) { return (source.ToString()); }
+		else if (type == typeof(DateTime)) { return ((DateTime)source).ToString("o"); }
 		// Internally explicitly registered reflectors take top priority, then implicitly registered reflectors
 		else if ((reflector = REFLECTOR(type)) != null) { return reflector(source); }
 		// Otherwise, resume automatic reflection
