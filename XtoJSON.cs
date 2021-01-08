@@ -60,6 +60,7 @@ using System.Linq;
 using System.Text; // Needed when paired alongside ZSharp, since StringBuilder is wrapped (outside of namespace)
 using System.Runtime.CompilerServices;
 using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 
 #region Abstract/Primary stuff
 
@@ -99,7 +100,7 @@ public static class Json {
 	/// <summary> Minor version number </summary>
 	public const int MINOR = 6;
 	/// <summary> Sub-minor version Revision number </summary>
-	public const int REV = 1;
+	public const int REV = 2;
 
 	/// <summary> String representation of current version of library </summary>
 	public static string VERSION { get { return MAJOR + "." + MINOR + "." + REV; } }
@@ -218,15 +219,30 @@ public static class Json {
 		return GetValue<T>(val);
 	}
 	
+	public static readonly IDictionary<Type, JsonType> DEFAULT_EXPECTED_REFLECTIONS = new ReadOnlyDictionary<Type, JsonType>(
+		new Dictionary<Type, JsonType>() {
+			{ typeof(string), JsonType.String },
+			{ typeof(Guid), JsonType.String },
+			{ typeof(DateTime), JsonType.String },
+			{ typeof(bool), JsonType.Boolean },
+			{ typeof(byte), JsonType.Number },
+			{ typeof(sbyte), JsonType.Number },
+			{ typeof(short), JsonType.Number },
+			{ typeof(ushort), JsonType.Number },
+			{ typeof(int), JsonType.Number },
+			{ typeof(uint), JsonType.Number },
+			{ typeof(long), JsonType.Number },
+			{ typeof(ulong), JsonType.Number },
+			{ typeof(float), JsonType.Number },
+			{ typeof(double), JsonType.Number },
+			{ typeof(decimal), JsonType.Number },
+		}
+	);
 	/// <summary> Get the expected reflected <see cref="JsonType"/> of a given <see cref="Type"/></summary>
 	public static JsonType ExpectedReflectedType(Type t) {
-		if (t == typeof(string)) { return JsonType.String; }
-		if (t == typeof(bool)) { return JsonType.Boolean; }
-		if (t.IsNumeric()) { return JsonType.Number; }
-
-		if (t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(List<>))) { return JsonType.Array; }
+		if (DEFAULT_EXPECTED_REFLECTIONS.ContainsKey(t)) { return DEFAULT_EXPECTED_REFLECTIONS[t]; }
 		if (t.IsArray) { return JsonType.Array; }
-
+		if (t.IsGenericType && (t.GetGenericTypeDefinition() == typeof(List<>))) { return JsonType.Array; }
 		return JsonType.Object;
 	}
 
@@ -2275,6 +2291,7 @@ public static class JsonReflector {
 		else if (val.isString && destType == typeof(string)) { sval = val.stringVal; }
 		else if (val.isString && destType == typeof(Guid)) { sval = Guid.Parse(val.stringVal); }
 		else if (val.isString && destType == typeof(DateTime)) { sval = DateTime.Parse(val.stringVal); }
+		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } 
 		else if (val.isString && destType.IsNumeric()) {
 			double numVal = 0;
 			double.TryParse(val.stringVal, out numVal);
@@ -2289,9 +2306,14 @@ public static class JsonReflector {
 		else if (val.isNumber && destType == typeof(double)) { sval = val.numVal; } 
 		else if (val.isNumber && destType == typeof(float)) { sval = (float)val.numVal; } 
 		else if (val.isNumber && destType == typeof(int)) { sval = (int)val.numVal; } 
-		else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } 
 		else if (val.isNumber && destType == typeof(long)) { sval = (long)val.numVal; } 
-		else if (val.isBool && destType == typeof(bool)) { sval = val.boolVal; } 
+		else if (val.isNumber && destType == typeof(byte)) { sval = (byte)val.numVal; } 
+		else if (val.isNumber && destType == typeof(short)) { sval = (short)val.numVal; } 
+		else if (val.isNumber && destType == typeof(uint)) { sval = (uint)val.numVal; } 
+		else if (val.isNumber && destType == typeof(ulong)) { sval = (ulong)val.numVal; } 
+		else if (val.isNumber && destType == typeof(ushort)) { sval = (ushort)val.numVal; } 
+		else if (val.isNumber && destType == typeof(decimal)) { sval = (decimal)val.numVal; } 
+		else if (val.isNumber && destType == typeof(sbyte)) { sval = (sbyte)val.numVal; } 
 		// Internally, explicitly registered generators take top priority, then implicitly registered generators. 
 		else if ((generator = GENERATOR(destType)) != null) { sval = generator(val); }
 		// Otherwise automatic reflection is used
@@ -2464,6 +2486,11 @@ public static class JsonReflector {
 		else if (type == typeof(long)) { return ((long)source); } 
 		else if (type == typeof(short)) { return ((short)source); } 
 		else if (type == typeof(bool)) { return ((bool)source); } 
+		else if (type == typeof(uint)) { return ((uint)source); } 
+		else if (type == typeof(ulong)) { return ((ulong)source); } 
+		else if (type == typeof(ushort)) { return ((ushort)source); } 
+		else if (type == typeof(decimal)) { return ((double)source); } 
+		else if (type == typeof(sbyte)) { return ((sbyte)source); } 
 		else if (type == typeof(Guid)) { return (source.ToString()); }
 		else if (type == typeof(DateTime)) { return ((DateTime)source).ToString("o"); }
 		// Internally explicitly registered reflectors take top priority, then implicitly registered reflectors
@@ -3022,6 +3049,10 @@ public static class JsonHelpers {
 		typeof(decimal),
 		typeof(byte),
 		typeof(short),
+		typeof(uint),
+		typeof(ulong),
+		typeof(ushort),
+		typeof(sbyte),
 	};
 
 	/// <summary> is a type a numeric type? </summary>
