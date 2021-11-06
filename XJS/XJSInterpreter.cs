@@ -6,7 +6,6 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Ex;
 using Lib;
 using static XJS.Nodes;
 
@@ -1177,7 +1176,7 @@ public partial class XJS {
 						}
 
 						if (func == null) {
-							Log.Error($"Unknown Function {target}");
+							throw new Exception($"Unknown Function {target}");
 						}
 
 
