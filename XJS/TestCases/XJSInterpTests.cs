@@ -194,23 +194,33 @@ for (var i = 0; i < {repsEach}; i++) {{ Delay(1); Increment(); }}
 					for (int i = 0; i < n; i++) { steppers.Add(interp.Async(program)); }
 					// Program should not run until `MoveNext` is called.
 					fieldVal().ShouldBe(k*n);
-					
 
-					for (int i = 0; i < n; i++) { Thread.Sleep(2); steppers[i].MoveNext(); }
+					Thread.Sleep(2);
+					Thread.Sleep(1);
+					for (int i = 0; i < n; i++) { steppers[i].MoveNext(); }
+					Thread.Sleep(2);
+					Thread.Sleep(1);
 					// Increment should be called twice per program at the begninning, before the first `Delay`. 
 					k+=initialIncrement;
 					fieldVal().ShouldBe(k*n);
 					
 
 					for (int j = 0; j < 4; j++) {
-						for (int i = 0; i < n; i++) { Thread.Sleep(2); steppers[i].MoveNext(); }
+						Thread.Sleep(2);
+						Thread.Sleep(1);
+						for (int i = 0; i < n; i++) {  steppers[i].MoveNext(); }
 						// Increment should be called once per program between each `Delay`. 
 						k+=1;
 						fieldVal().ShouldBe(k*n);
 					}
 					
 					// Run the rest...
-					for (int i = 0; i < n; i++) { while (steppers[i].MoveNext()) { Thread.Sleep(2); } }
+					for (int j = 0; j < repsEach; j++) {
+						Thread.Sleep(2);
+						Thread.Sleep(1);
+						for (int i = 0; i < n; i++) { steppers[i].MoveNext(); }
+							
+					}
 					fieldVal().ShouldBe((initialIncrement + repsEach) * n); 
 					
 				}
