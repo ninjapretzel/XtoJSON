@@ -1,4 +1,4 @@
-using Lib;
+﻿using Lib;
 using static XJS.Nodes;
 
 public partial class XJS {
@@ -895,8 +895,9 @@ public partial class XJS {
 
 		func.Map("varlist", tok.ParseVarList());
 
-		tok.RequireNext(ROCKET_TOKENS);
-
+		// tok.RequireNext(ROCKET_TOKENS);
+		if (tok.At(ROCKET_TOKENS)) { tok.Next(); }
+		
 		func.Map("codeblock", tok.ParseCodeBlock());
 
 		return func;

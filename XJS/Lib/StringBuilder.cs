@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using Builder = System.Text.StringBuilder;
 
 namespace Lib {

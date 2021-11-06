@@ -1,4 +1,4 @@
-/*	XtoJSON
+﻿/*	XtoJSON
 	Lightweight JSON Library for C#
 	2015-2020  Jonathan Cohen
 	Contact: ninjapretzel@yahoo.com
@@ -49,6 +49,9 @@
 //		Enabled - JsonObjects internally use ConcurrentDictionary<,> to hold Key/Value pairs.
 //		Disabled - JsonObjects internally use Dictionary<,> to hold Key/Value pairs.
 //	
+#if UNITY_2017_1_OR_NEWER
+using UnityEngine;
+#endif
 
 // Hook into some other useful diagnostic stuff
 using System;
@@ -61,6 +64,8 @@ using System.Text; // Needed when paired alongside ZSharp, since StringBuilder i
 using System.Runtime.CompilerServices;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.IO;
+using Ex;
 
 #region Abstract/Primary stuff
 
@@ -85,6 +90,8 @@ public enum JsonType {
 	Null,
 	/// <summary> Represents a function value </summary>
 	Function,
+	/// <summary> Represents a suspend value </summary>
+	Promise,
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,6 +156,12 @@ public static class Json {
 		JsonDeserializer jds = new JsonDeserializer(json);
 		JsonValue val = jds.Deserialize();
 		return GetValue<X>(val);
+	}
+
+	public static object To(Type t, string json) {
+		JsonDeserializer jds = new JsonDeserializer(json);
+		JsonValue val = jds.Deserialize();
+		return GetValue(val, t);
 	}
 
 	/// <summary> Converts pretty much anything to a JSON string representation of itself </summary>
@@ -718,6 +731,57 @@ public class JsonFunction : JsonValue {
 
 	/// <inheritdoc />
 	public override string ToString() { return "func()=>{}"; }
+}
+
+/// <summary> JsonValue representing a promise to provide a value in the future.
+/// Used to suspend execution of <see cref="XJS.AsyncInterpreter"/> </summary>
+public class JsonPromise : JsonValue {
+
+	/// <summary> Is there a value provided to this JsonPromise yet? </summary>
+	public bool hasValue { 
+		get {
+			if (!_hasValue) { TryComplete(); }
+			return _hasValue;
+		}
+	}
+	private volatile bool _hasValue;
+
+	/// <summary> A function which is called just before determining if a promise has a value or not. 
+	/// Subclasses can implement logic that updates and completes the promise if needed </summary>
+	protected virtual void TryComplete() { }
+
+	/// <summary> The current value provided to this JsonPromise </summary>
+	public JsonValue value { get; private set; }
+
+	/// <summary> Attempts to set the value, throwing if it has already been set. </summary>
+	/// <param name="value"> value to set promise to </param>
+	public void SetValue(JsonValue value) {
+		if (_hasValue) { throw new Exception("JsonPromise already has been bound to a value."); }
+		this.value = value;
+		_hasValue = true;
+	}
+
+	/// <summary> Constructor for a native promise. </summary>
+	public JsonPromise() {
+		_hasValue = false;
+	}
+	
+	/// <inheritdoc />
+	public override JsonType JsonType { get { return JsonType.Promise; } }
+
+	/// <inheritdoc />
+	public override string PrettyPrint() { 
+		string innerValue = "?";
+		if (_hasValue) { innerValue = value.PrettyPrint(); }
+		return $"{{ Promise<JsonValue>({innerValue}) }}"; 
+	}
+
+	/// <inheritdoc />
+	public override string ToString() {
+		string innerValue = "?";
+		if (_hasValue) { innerValue = value.ToString(); }
+		return $"{{ Promise<JsonValue>({innerValue}) }}";
+	}
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////
@@ -2233,12 +2297,15 @@ public static class JsonReflector {
 	}
 
 	static readonly Type typeofNullable = typeof(Nullable<int>).GetGenericTypeDefinition();
+
+	#if UNITY_2017_1_OR_NEWER
 	static readonly Type typeofPhysicMaterial = Type.GetType("UnityEngine.PhysicMaterial, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	static readonly Type typeofMaterial = Type.GetType("UnityEngine.Material, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	static readonly Type typeofQuaternion = Type.GetType("UnityEngine.Quaternion, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
 	static readonly Type typeofRigidBody = Type.GetType("UnityEngine.Rigidbody, UnityEngine, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null", false);
+
 	/// <summary> Did the Load() function run? (Should always return true) </summary>
-	public static bool loaded = Load();
+	public static bool loaded { get; private set; } = Load();
 	static bool Load() {
 		// PhysicMaterials and Materials are resource objects, and many objects have automatic duplication in setters for these types.
 		// They are blacklisted to prevent materials from being silently duplicated and leaked, and also so that resource references are preserved in prefabs
@@ -2248,6 +2315,66 @@ public static class JsonReflector {
 
 		return true;
 	}
+	private static bool _RegisteredUnityStructRefGen = RegisterUnityStructRefGen();
+	public static bool RegisterUnityStructRefGen() {
+		RegisterGenerator(V2Gen);
+		RegisterGenerator(V3Gen);
+		RegisterGenerator(V4Gen);
+		RegisterGenerator(QGen);
+		RegisterGenerator(CGen);
+		RegisterGenerator(C32Gen);
+		
+		RegisterReflector<Vector2>(V2Ref);
+		RegisterReflector<Vector3>(V3Ref);
+		RegisterReflector<Vector4>(V4Ref);
+		RegisterReflector<Quaternion>(QRef);
+		RegisterReflector<Color>(CRef);
+		RegisterReflector<Color32>(C32Ref);
+		return true;
+	}
+	public static Vector2 V2Gen(JsonValue val) {
+		if (val.isArray) { return new Vector2(val[0].floatVal, val[1].floatVal); }
+		if (val.isObject) { return new Vector2(val["x"].floatVal, val["y"].floatVal); }
+		if (val.isNumber) { return new Vector2(val.floatVal, val.floatVal); }
+		return Vector2.zero;
+	}
+	public static Vector3 V3Gen(JsonValue val) {
+		if (val.isArray) { return new Vector3(val[0].floatVal, val[1].floatVal, val[2].floatVal); }
+		if (val.isObject) { return new Vector3(val["x"].floatVal, val["y"].floatVal, val["z"].floatVal); }
+		if (val.isNumber) { return new Vector3(val.floatVal, val.floatVal, val.floatVal); }
+		return Vector3.zero;
+	}
+	public static Vector4 V4Gen(JsonValue val) {
+		if (val.isArray) { return new Vector4(val[0].floatVal, val[1].floatVal, val[2].floatVal, val[3].floatVal); }
+		if (val.isObject) { return new Vector4(val["x"].floatVal, val["y"].floatVal, val["z"].floatVal, val["w"].floatVal); }
+		if (val.isNumber) { return new Vector4(val.floatVal, val.floatVal, val.floatVal, val.floatVal); }
+		return Vector4.zero;
+	}
+	public static Color CGen(JsonValue val) {
+		if (val.isArray) { return new Color(val[0].floatVal, val[1].floatVal, val[2].floatVal, val[3].floatVal); }
+		if (val.isObject) { return new Color(val["r"].floatVal, val["g"].floatVal, val["b"].floatVal, val["a"].floatVal); }
+		if (val.isNumber) { return new Color(val.floatVal, val.floatVal, val.floatVal, val.floatVal); }
+		return Color.white;
+	}
+	public static Color32 C32Gen(JsonValue val) {
+		if (val.isArray) { return new Color32((byte)val[0].intVal, (byte)val[1].intVal, (byte)val[2].intVal, (byte)val[3].intVal); }
+		if (val.isObject) { return new Color32((byte)val["r"].intVal, (byte)val["g"].intVal, (byte)val["b"].intVal, (byte)val["a"].intVal); }
+		if (val.isNumber) { return new Color32((byte)val.intVal, (byte)val.intVal, (byte)val.intVal, (byte)val.intVal); }
+		return new Color32(255, 255, 255, 255);
+	}
+	public static Quaternion QGen(JsonValue val) {
+		if (val.isArray) { return new Quaternion(val[0].floatVal, val[1].floatVal, val[2].floatVal, val[3].floatVal); }
+		if (val.isObject) { return new Quaternion(val["x"].floatVal, val["y"].floatVal, val["z"].floatVal, val["w"].floatVal); }
+		if (val.isNumber) { return new Quaternion(val.floatVal, val.floatVal, val.floatVal, val.floatVal); }
+		return Quaternion.identity;
+	}
+	public static JsonValue V2Ref(Vector2 v) { return new JsonArray(v.x, v.y); }
+	public static JsonValue V3Ref(Vector3 v) { return new JsonArray(v.x, v.y, v.z); }
+	public static JsonValue V4Ref(Vector4 v) { return new JsonArray(v.x, v.y, v.z, v.w); }
+	public static JsonValue QRef(Quaternion q) { return new JsonArray(q.x, q.y, q.z, q.w); }
+	public static JsonValue CRef(Color c) { return new JsonArray(c.r, c.g, c.b, c.a); }
+	public static JsonValue C32Ref(Color32 c) { return new JsonArray(c.r, c.g, c.b, c.a); }
+	#endif
 
 	/// <summary> Dictionary holding cached delegates </summary>
 	public static readonly IDictionary<Type, Func<object, JsonValue>> CACHED_REFLECTORS = new ConcurrentDictionary<Type, Func<object, JsonValue>>();
@@ -2351,20 +2478,32 @@ public static class JsonReflector {
 			//TBD: Reflect the JsonObject into a new object of that type???
 			JsonObject jobj = val as JsonObject;
 
+
+
 			if (destType.IsValueType) {
 				object boxedValue = Activator.CreateInstance(destType);
 				FieldInfo[] fields = destType.GetFields();
+				PropertyInfo[] props = destType.GetProperties();
 
+				#if UNITY_2017_1_OR_NEWER
 				if (typeofQuaternion != null && destType == typeofQuaternion) {
 					// Remove 'eulerAngles' from Quaternions, as it is redundant information
 					// which is calculated from other information in the struct.
 					fields = fields.Where((field) => (field.Name != "eulerAngles")).ToArray();
 				}
+				#endif
 
 				foreach (FieldInfo field in fields) {
 					object innerVal = GetReflectedValue(jobj[field.Name], field.FieldType);
 					if (innerVal != null) {
 						field.SetValue(boxedValue, innerVal);
+					}
+				}
+				foreach (PropertyInfo prop in props) {
+					if (!prop.CanWrite) { continue; }
+					object innerVal = GetReflectedValue(jobj[prop.Name], prop.PropertyType);
+					if (innerVal != null) {
+						prop.SetValue(boxedValue, innerVal);
 					}
 				}
 				return boxedValue;
@@ -2586,9 +2725,11 @@ public static class JsonReflector {
 
 				// Skip Quaternion.eulerAngles, as it's redundant information
 				// which is calculated from other information in the struct. 
+				#if UNITY_2017_1_OR_NEWER
 				if (type == typeofQuaternion && property.Name == "eulerAngles") { continue; }
 				// This property is deprecated as of UNITY_5. This prevents warnings when serializing rigidbodies.
 				if (type == typeofRigidBody && property.Name == "useConeFriction") { continue; }
+				#endif
 
 				MethodInfo propGet = property.GetGetMethod();
 

@@ -1,4 +1,4 @@
-using static JsonTests.TestFramework;
+﻿using static JsonTests.TestFramework;
 
 namespace JsonTests {
 

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Text.RegularExpressions;
 
 public partial class XJS {
@@ -129,6 +129,10 @@ public partial class XJS {
 			if (c == '\n') { return new Token(NEWLINE, line, col); }
 			if (c == '\"') { return ExtractString('\"'); }
 			if (c == '\'') { return ExtractString('\''); }
+			if (src.MatchAt(i, ".")) { // allow check for number if there is a `.` instead of forcing it to be a punctuation character.
+				Match numChk = num.Match(src, i);
+				if (numChk.Success && numChk.Index == i) { return new Token(numChk.Value, NUMBER, line, col); }
+			}
 			foreach (string p in punct) { if (src.MatchAt(i, p)) { return new Token(p, line, col); } }
 			foreach (string k in keywords) { if (src.MatchAt(i, k) && !src.AlphaNumAt(i + k.Length)) { return new Token(k, line, col); } }
 

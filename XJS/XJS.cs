@@ -1,7 +1,7 @@
-#if UNITY_2 || UNITY_3 || UNITY_4 || UNITY_5 || UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
+﻿#if UNITY_5_3_OR_NEWER
 #define UNITY
 
-#if UNITY_2017 || UNITY_2018 || UNITY_2019 || UNITY_2020
+#if UNITY_2017_1_OR_NEWER
 #define COMP_SERVICES
 // Early unity doesn't have access to this namespace.
 using System.Runtime.CompilerServices;
@@ -10,12 +10,13 @@ using System.Runtime.CompilerServices;
 using UnityEngine;
 #else
 #define COMP_SERVICES
+using System.Runtime.CompilerServices;
 #endif
 
 using System.Text.RegularExpressions;
 
 /// <summary> Container class for XJS language </summary>
-public static partial class XJS {
+public static partial class XJS { 
 
 	public static class Debug {
 		public static void Log(object o) {
