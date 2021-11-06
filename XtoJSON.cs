@@ -1284,7 +1284,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <summary> Copy infomration from another JsonObject. This is a shallow copy. </summary>
 	public JsonObject(JsonObject src) : this() { Add(src); }
 	
-	/// <summary> Create an JsonObject, setting its data to the parameter. </summary>
+	/// <summary> Create an JsonObject, using the given <see cref="IDictionary"/> as its internal collection. </summary>
 	public JsonObject(IDictionary<JsonString, JsonValue> src) : base() { data = src; }
 	
 	/// <summary> Initialize with an array of key,value pairs</summary>
