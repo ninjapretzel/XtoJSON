@@ -1591,7 +1591,7 @@ public class JsonObject : JsonValue, IEnumerable<KeyValuePair<JsonString, JsonVa
 	/// <summary> Pretty prints the given JsonObject into a easily human-readable string. </summary>
 	/// <returns> PrettyPrinted string version of this object </returns>
 	public override string PrettyPrint() {
-		return new JsonPrettyPrinter().PrettyPrint(this).ToString();
+		return new JsonPrettyPrinter(false).PrettyPrint(this).ToString();
 	}
 
 }
@@ -2042,8 +2042,13 @@ public class JsonArray : JsonValue, IEnumerable<JsonValue>, IList<JsonValue> {
 /// <summary> Provides thread-safe pretty printing </summary>
 public class JsonPrettyPrinter {
 
+	public JsonPrettyPrinter() { }
+	public JsonPrettyPrinter(bool sorted) { this.sorted = sorted; }
+
 	/// <summary> Current indent level </summary>
 	private int indentLevel = 0;
+	/// <summary> Should keys be sorted before printing?</summary>
+	private bool sorted = false;
 
 	/// <summary> PrettyPrints a given JsonObject. </summary>
 	/// <param name="obj">JsonObject to PrettyPrint</param>
@@ -2056,9 +2061,16 @@ public class JsonPrettyPrinter {
 		str.Append(tabs);
 		str.Append('{');
 		indentLevel++;
+		IEnumerable<KeyValuePair<JsonString, JsonValue>> iter = obj;
+		if (sorted) {
+			List<KeyValuePair<JsonString, JsonValue>> pairs = new List<KeyValuePair<JsonString, JsonValue>>();
+			foreach (var pair in obj) { pairs.Add(pair); }
+			pairs.Sort( (a,b) => (a.Key.stringVal.CompareTo(b.Key.stringVal)));
+			iter = pairs;
+		}
 
 		int i = 0;
-		foreach (var pair in obj) {
+		foreach (var pair in iter) {
 			str.Append('\n');
 			str.Append(tabs);
 			str.Append('\t');
