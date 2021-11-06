@@ -28,8 +28,9 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Collections.Concurrent;
+#if UNITY_EDITOR
 using static JsonTests.TestFramework;
-
+#endif 
 #if UNITY
 namespace JsonTests {
 

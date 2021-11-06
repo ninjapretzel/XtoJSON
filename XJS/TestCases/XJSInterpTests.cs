@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+#if UNITY_EDITOR
 using static JsonTests.TestFramework;
 
 namespace JsonTests {
@@ -234,3 +235,4 @@ for (var i = 0; i < {repsEach}; i++) {{ Delay(1); Increment(); }}
 
 #endif
 }
+#endif

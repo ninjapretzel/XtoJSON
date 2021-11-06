@@ -1,4 +1,5 @@
-﻿using static JsonTests.TestFramework;
+﻿#if UNITY_EDITOR
+using static JsonTests.TestFramework;
 
 namespace JsonTests {
 
@@ -310,3 +311,4 @@ fn(1, 2, 3, 4, 5);
 
 #endif
 }
+#endif
